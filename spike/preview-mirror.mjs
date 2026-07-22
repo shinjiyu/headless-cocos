@@ -83,7 +83,6 @@ const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
 const { GLTF_EXTS, importGltf } = gltfImporter;
 const { FBX_EXTS, importFbx } = fbxImporter;
-const { FBX_EXTS, importFbx } = fbxImporter;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -1044,24 +1043,6 @@ function importFbxLogged(absPath, label) {
         '[fbx-import]',
         label,
         `meshes=${r.meshes.filter(Boolean).length}`,
-        `→ ${r.uuid}`,
-      );
-    }
-    return r;
-  } catch (err) {
-    console.warn('[fbx-import] failed', label, err.message);
-    return null;
-  }
-}
-function importFbxLogged(absPath, label) {
-  try {
-    const r = importFbx(absPath, LIBRARY);
-    if (r && r.changed.length) {
-      console.log(
-        '[fbx-import]',
-        label,
-        `via=${path.basename(r.via || '')}`,
-        `meshes=${r.meshes.length}`,
         `→ ${r.uuid}`,
       );
     }
