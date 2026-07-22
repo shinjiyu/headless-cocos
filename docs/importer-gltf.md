@@ -2,39 +2,38 @@
 
 Headless importer for Cocos Creator 3.8 mesh assets.
 
+**Status:** Creator-aligned glTF 2.0 path is feature-complete for builtin /
+advanced effects that ship with 3.8. Remaining gaps are things Creator itself
+skips, or extensions with no matching effect.
+
 ## Scope
 
-| Supported | Not yet / out of scope |
-|-----------|------------------------|
-| `.gltf` + external `.bin` / images | Cameras / lights (**Creator also skips** — not planned) |
-| `.glb` (JSON + BIN chunks) | |
-| **Multi-buffer** (external bins flattened to buffer 0) | |
-| `.fbx` via Creator `FBX2glTF` → glTF | |
-| **EXT_/KHR_meshopt_compression** (`meshoptimizer`) | |
-| **KHR_draco_mesh_compression** (`draco3dgltf`) | |
-| POSITION / NORMAL / TEXCOORD_0 [/ **TEXCOORD_1**] / TANGENT | |
-| **Sparse accessors** (incl. no bufferView) | |
-| **COLOR_0** (+ `USE_VERTEX_COLOR`) | |
-| `texCoord=1` → `HAS_SECOND_UV` / `*_UV: v_uv1` | |
-| **KHR_texture_transform** → `tilingOffset` | |
-| **KHR_materials_clearcoat** → `car-paint` effect | |
-| **KHR_materials_sheen** → `fabric` effect | |
-| **KHR_materials_transmission** → `glass` effect (approx + volume/ior) | |
-| **KHR_materials_variants** (import-time bake via `options.variant`) | |
-| **KHR_materials_unlit** → `builtin-unlit` | |
-| **KHR_materials_emissive_strength** → `emissiveScale` | |
-| **KHR_materials_ior** / **specular** → `specularIntensity` | |
-| **KHR_materials_anisotropy** → `IS_ANISOTROPY` | |
-| **JOINTS_0 / WEIGHTS_0** [+ **JOINTS_n / WEIGHTS_n** → top-4] + `gltf-skeleton` | |
-| **Morph targets** (POSITION [/ NORMAL / TANGENT]) + weight tracks | |
-| **All meshes + all primitives** | |
-| **Full node hierarchy + TRS** → prefab | |
-| **Animations** → ExoticAnimation CCON (`.bin`) | |
-| Albedo + **normal / pbrMap (ORM) / occlusion / emissive** | |
-| **alphaMode** MASK / BLEND (+ doubleSided) | |
-| Preserve Creator `.meta` sub-ids | |
-| **Poly Haven fetch** → `importGltf` (`docs/polyhaven.md`) | |
-| Mirror **`/__polyhaven?spawn=1&variant=`** / **`/__gltf?file=&variant=`** | |
+### Supported
+
+| Area | Notes |
+|------|--------|
+| `.gltf` / `.glb` / multi-buffer bins | Flattened to buffer 0 before reads |
+| `.fbx` | Via Creator `FBX2glTF` → glTF |
+| Mesh attrs | POSITION, NORMAL, TEXCOORD_0/1, TANGENT, COLOR_0, sparse accessors |
+| Skin | JOINTS_n / WEIGHTS_n → Creator top-4 → `a_joints` / `a_weights` + skeleton |
+| Morph | POSITION [/ NORMAL / TANGENT] + weight tracks |
+| Hierarchy / anim | Full node TRS prefab; ExoticAnimation CCON |
+| Compression | `EXT_/KHR_meshopt_compression`, `KHR_draco_mesh_compression` |
+| PBR maps | Albedo, normal, ORM/pbrMap, occlusion, emissive; alpha MASK/BLEND; doubleSided |
+| UV / transform | `texCoord=1`, `KHR_texture_transform` → tilingOffset |
+| Materials | unlit; clearcoat→car-paint; sheen→fabric; transmission→glass (approx); ior/specular; emissive_strength; anisotropy |
+| Variants | `KHR_materials_variants` baked via `options.variant` / mirror `?variant=` |
+| Online / mirror | Poly Haven fetch; `/__polyhaven`, `/__gltf` |
+
+### Intentionally skipped / approximate
+
+| Item | Why |
+|------|-----|
+| Cameras / lights | Creator glTF importer also skips — not planned |
+| `KHR_materials_iridescence` | No matching builtin/advanced effect in 3.8 |
+| Transmission / volume | Mapped to **stylized** `glass` (not path-traced refraction) |
+| `KHR_texture_basisu` / WebP GPU decode | Out of scope; use pre-decoded images |
+| Runtime material variant switcher | Creator has none; bake at import only |
 
 ## Library products
 
@@ -61,41 +60,26 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 
 ## Code
 
-- `spike/importers/gltf.cjs` — hierarchy + multi-prim + animations + skins + morphs
+- `spike/importers/gltf.cjs` — hierarchy + multi-prim + animations + skins + morphs + materials
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
-- Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-sheen.cjs`, `e2e-gltf-transmission.cjs`, `e2e-gltf-variants.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-gltf-joints1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- Mirror: `PACKER=mini` boot + watcher + `/__gltf` / `/__polyhaven`
+- Smoke: `spike/e2e-gltf-all.cjs` (local fixtures); `--extra` for morph/anim/skin/network/fbx
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
 
 ```powershell
-node .\spike\e2e-gltf.cjs
-node .\spike\e2e-gltf-hierarchy.cjs
-node .\spike\e2e-gltf-anim.cjs --disk-only
-node .\spike\e2e-gltf-skin.cjs
-node .\spike\e2e-gltf-skin.cjs --fbx
-node .\spike\e2e-gltf-morph.cjs
-node .\spike\e2e-gltf-pbr.cjs
-node .\spike\e2e-gltf-alpha.cjs
-node .\spike\e2e-gltf-color-uv1.cjs
-node .\spike\e2e-gltf-uv1-transform.cjs
-node .\spike\e2e-gltf-clearcoat.cjs
-node .\spike\e2e-gltf-sheen.cjs
-node .\spike\e2e-gltf-transmission.cjs
-node .\spike\e2e-gltf-variants.cjs
-node .\spike\e2e-gltf-unlit.cjs
-node .\spike\e2e-gltf-emissive-strength.cjs
-node .\spike\e2e-gltf-ior-anisotropy.cjs
-node .\spike\e2e-gltf-sparse.cjs
-node .\spike\e2e-gltf-meshopt.cjs
-node .\spike\e2e-gltf-draco.cjs
-node .\spike\e2e-gltf-multibuffer.cjs
-node .\spike\e2e-gltf-joints1.cjs
-node .\spike\e2e-polyhaven.cjs
-node .\spike\e2e-fbx.cjs
+# Local fixture smoke (no browser / no network)
+npm run test:gltf
+# or: node .\spike\e2e-gltf-all.cjs
+
+# Also try optional fixtures / network when available
+node .\spike\e2e-gltf-all.cjs --extra
 ```
+
+Individual suites still live under `spike/e2e-gltf-*.cjs` (see filenames). Browser-backed
+checks: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs` (need preview-mirror).
 
 Meshopt / Draco: `npm i meshoptimizer draco3dgltf`, then `await prepareMeshopt()` / `prepareDraco()` (or `importGltfAsync` / `prepareGltfDecoders`) before importing compressed assets. Mirror boots both automatically.
 
