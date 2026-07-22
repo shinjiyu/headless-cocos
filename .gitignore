@@ -32,3 +32,8 @@ trace/
 **/._gltf_embed_*
 **/._fbx_*
 
+# agent demo secrets
+docker/.env.agent-demo
+demo/agent-demo/.env
+demo/agent-demo/_*-sdk-run.jsonl
+

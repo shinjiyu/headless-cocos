@@ -1,0 +1,57 @@
+# DEMO: Cursor (or stub) edits Cocos project on disk → headless preview HMR.
+# No Cocos Creator IDE. No cocos-meta-mcp.
+#
+# Usage (from repo root):
+#   docker compose -f docker/docker-compose.agent-demo.yml up --build
+# Then open http://127.0.0.1:8790/
+#
+# For real Cursor SDK inside the agent container, put CURSOR_API_KEY in
+# docker/.env.agent-demo (see demo/agent-demo/.env.example) and set
+# BACKEND=sdk in the compose environment or WebUI.
+
+services:
+  cocos-preview-demo:
+    image: cocos-headless-preview:latest
+    build:
+      context: ./build-context
+    container_name: cocos-preview-agent-demo
+    ports:
+      - "7470:7460"
+    volumes:
+      - "d:/tempWorkspace/baseAIAutoCocos:/workspace"
+    environment:
+      PACKER: mini
+      PORT: 7460
+      PROJECT: /workspace
+      NPM_ROOT: /app/node_modules
+      UUID_UTIL: /app/vendor-utils/dist/uuid.js
+      ENGINE_SNAPSHOT: /engine
+      PROJECT_URL: "file:///D:/tempWorkspace/baseAIAutoCocos"
+      WATCH_POLL: "1"
+      WATCH_POLL_MS: "800"
+    restart: unless-stopped
+
+  agent-demo:
+    build:
+      context: ../demo/agent-demo
+    container_name: cocos-agent-demo
+    ports:
+      - "8790:8790"
+    volumes:
+      # Same project the preview watches — agent writes here, HMR picks it up.
+      - "d:/tempWorkspace/baseAIAutoCocos:/workspace"
+    env_file:
+      - path: .env.agent-demo
+        required: false
+    environment:
+      PORT: 8790
+      PROJECT_ROOT: /workspace
+      # Host browser loads iframe; use published preview port.
+      PREVIEW_URL: http://127.0.0.1:7470/
+      # stub = prove disk→HMR with no Cursor; sdk = @cursor/sdk local (needs CURSOR_API_KEY)
+      BACKEND: ${BACKEND:-stub}
+      CURSOR_MODEL: ${CURSOR_MODEL:-composer-2.5}
+      # CURSOR_API_KEY: only via env_file / host export — do not set empty override here.
+    depends_on:
+      - cocos-preview-demo
+    restart: unless-stopped

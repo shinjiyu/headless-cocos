@@ -1,0 +1,17 @@
+{
+  "name": "headless-agent-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DEMO: Cursor agent edits Cocos project on disk; headless preview HMR (no MCP)",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "start:stub": "BACKEND=stub node server.mjs"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.23"
+  }
+}
