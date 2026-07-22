@@ -9,7 +9,8 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | `.gltf` + external `.bin` / images | Cameras / lights (**Creator also skips** — not planned) |
 | `.glb` (JSON + BIN chunks) | |
 | `.fbx` via Creator `FBX2glTF` → glTF | |
-| POSITION / NORMAL / TEXCOORD_0 / TANGENT | |
+| POSITION / NORMAL / TEXCOORD_0 [/ **TEXCOORD_1**] / TANGENT | |
+| **COLOR_0** (+ `USE_VERTEX_COLOR`) | |
 | **JOINTS_0 / WEIGHTS_0** + `gltf-skeleton` | |
 | **Morph targets** (POSITION [/ NORMAL / TANGENT]) + weight tracks | |
 | **All meshes + all primitives** | |
@@ -27,7 +28,7 @@ Root meta: `importer: "gltf"` (or `"fbx"`), `files: []`.
 
 | Sub | Importer | Files |
 |-----|----------|-------|
-| mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive; skinned stride 72; morph deltas) |
+| mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive; optional color/uv1; skinned stride 72+; morph deltas) |
 | texture | `texture` | `.json` |
 | material | `gltf-material` | `.json` (builtin-standard + MASK/`USE_ALPHA_TEST` + BLEND/`_techIdx:1`) |
 | skeleton (per skin) | `gltf-skeleton` | `.json` (`_joints` paths + `_bindposes`) |
@@ -50,7 +51,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -64,6 +65,7 @@ node .\spike\e2e-gltf-skin.cjs --fbx
 node .\spike\e2e-gltf-morph.cjs
 node .\spike\e2e-gltf-pbr.cjs
 node .\spike\e2e-gltf-alpha.cjs
+node .\spike\e2e-gltf-color-uv1.cjs
 node .\spike\e2e-polyhaven.cjs
 node .\spike\e2e-fbx.cjs
 ```
@@ -93,3 +95,8 @@ Alpha (`fixtures/gltf-alpha/alpha-modes.gltf`):
 - `BLEND` → `_techIdx: 1`, depthWrite off, SrcAlpha / OneMinusSrcAlpha
 - `MASK` → `USE_ALPHA_TEST` + `alphaThreshold`
 - `doubleSided` → cullMode `NONE` + `USE_TWOSIDE`
+
+COLOR / UV1 (`fixtures/gltf-color-uv1/color-uv1.gltf`):
+
+- `COLOR_0` (normalized u8) → `a_color` RGBA32F + material `USE_VERTEX_COLOR`
+- `TEXCOORD_1` → `a_texCoord1`

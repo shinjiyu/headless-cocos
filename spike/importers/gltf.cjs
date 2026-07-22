@@ -4,10 +4,11 @@
 /**
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
- * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT] [/ JOINTS+WEIGHTS]
- * [/ morph POSITION+NORMAL+TANGENT]), PBR materials (albedo/normal/pbrMap/occlusion/
- * emissive), full node hierarchy, ExoticAnimation clips, morph-weight tracks, and
- * skins. No lights / cameras (Creator also skips).
+ * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
+ * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
+ * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color),
+ * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
+ * No lights / cameras (Creator also skips).
  */
 
 const crypto = require('crypto');
@@ -21,7 +22,7 @@ const GLTF_EXTS = new Set(['.gltf', '.glb']);
 const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
 
 // Cocos GFX Format enum values used in Mesh._struct
-const FMT = { RG32F: 21, RGB32F: 32, RGBA16UI: 42, RGBA32F: 44 };
+const FMT = { RG32F: 21, RGB32F: 32, RGBA8: 35, RGBA16UI: 42, RGBA32F: 44 };
 const PRIM_TRIANGLES = 7;
 
 const COMPONENT = {
@@ -131,16 +132,54 @@ function accessorInfo(doc, accessorIndex) {
   return { acc, count, comp, base, stride, view };
 }
 
+function normalizeComponent(componentType, value) {
+  switch (componentType) {
+    case 5120: return Math.max(value / 127, -1); // BYTE
+    case 5121: return value / 255; // UNSIGNED_BYTE
+    case 5122: return Math.max(value / 32767, -1); // SHORT
+    case 5123: return value / 65535; // UNSIGNED_SHORT
+    default: return value;
+  }
+}
+
 function readAccessor(doc, accessorIndex) {
   const { acc, count, comp, base, stride } = accessorInfo(doc, accessorIndex);
   const out = new Float32Array(acc.count * count);
+  const normalized = !!acc.normalized;
   for (let i = 0; i < acc.count; i++) {
     const row = base + i * stride;
     for (let c = 0; c < count; c++) {
-      out[i * count + c] = comp.read(doc.bin, row + c * comp.size);
+      let v = comp.read(doc.bin, row + c * comp.size);
+      if (normalized) v = normalizeComponent(acc.componentType, v);
+      out[i * count + c] = v;
     }
   }
-  return { values: out, count: acc.count, components: count, min: acc.min, max: acc.max };
+  return {
+    values: out,
+    count: acc.count,
+    components: count,
+    min: acc.min,
+    max: acc.max,
+    normalized,
+  };
+}
+
+/** COLOR_0 as float RGBA (pads alpha=1 when VEC3). */
+function readColorRGBA(doc, accessorIndex, nVert) {
+  const acc = readAccessor(doc, accessorIndex);
+  const out = new Float32Array(nVert * 4);
+  const c = acc.components;
+  for (let i = 0; i < nVert; i++) {
+    if (c >= 3) {
+      out[i * 4] = acc.values[i * c] || 0;
+      out[i * 4 + 1] = acc.values[i * c + 1] || 0;
+      out[i * 4 + 2] = acc.values[i * c + 2] || 0;
+      out[i * 4 + 3] = c >= 4 ? (acc.values[i * c + 3] || 0) : 1;
+    } else {
+      out[i * 4] = out[i * 4 + 1] = out[i * 4 + 2] = out[i * 4 + 3] = 1;
+    }
+  }
+  return out;
 }
 
 function readIndices(doc, accessorIndex) {
@@ -175,6 +214,15 @@ function buildPrimitiveBuffers(doc, primitive) {
     }
   }
 
+  const hasColor = attrs.COLOR_0 != null;
+  const colorValues = hasColor
+    ? readColorRGBA(doc, attrs.COLOR_0, nVert)
+    : null;
+  const hasUv1 = attrs.TEXCOORD_1 != null;
+  const uv1 = hasUv1
+    ? readAccessor(doc, attrs.TEXCOORD_1)
+    : null;
+
   const skinned = attrs.JOINTS_0 != null && attrs.WEIGHTS_0 != null;
   let jointsValues = null;
   let weightsValues = null;
@@ -188,7 +236,16 @@ function buildPrimitiveBuffers(doc, primitive) {
     }
   }
 
-  const stride = skinned ? 72 : 48;
+  // Layout: pos(12)+nor(12)+uv0(8)+tan(16) [=48]
+  //       + [color(16)] + [uv1(8)] + [joints(8)+weights(16)]
+  let stride = 48;
+  const colorOff = hasColor ? stride : -1;
+  if (hasColor) stride += 16;
+  const uv1Off = hasUv1 ? stride : -1;
+  if (hasUv1) stride += 8;
+  const jointsOff = skinned ? stride : -1;
+  if (skinned) stride += 24;
+
   const vb = Buffer.alloc(nVert * stride);
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -207,15 +264,26 @@ function buildPrimitiveBuffers(doc, primitive) {
     vb.writeFloatLE(tanValues[i * 4 + 1] || 0, o + 36);
     vb.writeFloatLE(tanValues[i * 4 + 2] || 0, o + 40);
     vb.writeFloatLE(tanValues[i * 4 + 3] || 1, o + 44);
+    if (hasColor) {
+      const c = i * 4;
+      vb.writeFloatLE(colorValues[c], o + colorOff);
+      vb.writeFloatLE(colorValues[c + 1], o + colorOff + 4);
+      vb.writeFloatLE(colorValues[c + 2], o + colorOff + 8);
+      vb.writeFloatLE(colorValues[c + 3], o + colorOff + 12);
+    }
+    if (hasUv1) {
+      vb.writeFloatLE(uv1.values[i * 2] || 0, o + uv1Off);
+      vb.writeFloatLE(uv1.values[i * 2 + 1] || 0, o + uv1Off + 4);
+    }
     if (skinned) {
-      vb.writeUInt16LE(jointsValues[i * 4] | 0, o + 48);
-      vb.writeUInt16LE(jointsValues[i * 4 + 1] | 0, o + 50);
-      vb.writeUInt16LE(jointsValues[i * 4 + 2] | 0, o + 52);
-      vb.writeUInt16LE(jointsValues[i * 4 + 3] | 0, o + 54);
-      vb.writeFloatLE(weightsValues[i * 4] || 0, o + 56);
-      vb.writeFloatLE(weightsValues[i * 4 + 1] || 0, o + 60);
-      vb.writeFloatLE(weightsValues[i * 4 + 2] || 0, o + 64);
-      vb.writeFloatLE(weightsValues[i * 4 + 3] || 0, o + 68);
+      vb.writeUInt16LE(jointsValues[i * 4] | 0, o + jointsOff);
+      vb.writeUInt16LE(jointsValues[i * 4 + 1] | 0, o + jointsOff + 2);
+      vb.writeUInt16LE(jointsValues[i * 4 + 2] | 0, o + jointsOff + 4);
+      vb.writeUInt16LE(jointsValues[i * 4 + 3] | 0, o + jointsOff + 6);
+      vb.writeFloatLE(weightsValues[i * 4] || 0, o + jointsOff + 8);
+      vb.writeFloatLE(weightsValues[i * 4 + 1] || 0, o + jointsOff + 12);
+      vb.writeFloatLE(weightsValues[i * 4 + 2] || 0, o + jointsOff + 16);
+      vb.writeFloatLE(weightsValues[i * 4 + 3] || 0, o + jointsOff + 20);
     }
     if (px < minX) minX = px; if (py < minY) minY = py; if (pz < minZ) minZ = pz;
     if (px > maxX) maxX = px; if (py > maxY) maxY = py; if (pz > maxZ) maxZ = pz;
@@ -245,6 +313,8 @@ function buildPrimitiveBuffers(doc, primitive) {
     min: [minX, minY, minZ],
     max: [maxX, maxY, maxZ],
     skinned,
+    hasColor,
+    hasUv1,
     maxJointIndex,
     stride,
   };
@@ -280,6 +350,12 @@ function buildMeshFromGltfMesh(doc, gltfMesh, skin) {
       { name: 'a_texCoord', format: FMT.RG32F, isNormalized: false },
       { name: 'a_tangent', format: FMT.RGBA32F, isNormalized: false },
     ];
+    if (b.hasColor) {
+      attributes.push({ name: 'a_color', format: FMT.RGBA32F, isNormalized: false });
+    }
+    if (b.hasUv1) {
+      attributes.push({ name: 'a_texCoord1', format: FMT.RG32F, isNormalized: false });
+    }
     if (b.skinned) {
       attributes.push(
         { name: 'a_joints', format: FMT.RGBA16UI, isNormalized: false },
@@ -1128,7 +1204,7 @@ function colorFromFactor(factor, fallback) {
  * @param {object} mat glTF material
  * @param {string[]} textureIds texture sub-uuids by glTF texture index
  */
-function materialJson(mat, textureIds) {
+function materialJson(mat, textureIds, options = {}) {
   const pbr = mat.pbrMetallicRoughness || {};
   const props = {
     tilingOffset: { __type__: 'cc.Vec4', x: 1, y: 1, z: 0, w: 0 },
@@ -1140,6 +1216,9 @@ function materialJson(mat, textureIds) {
   };
   const defines = [{}];
 
+  if (options.useVertexColor) {
+    defines[0].USE_VERTEX_COLOR = true;
+  }
   const albedoIdx = pbr.baseColorTexture && pbr.baseColorTexture.index;
   if (albedoIdx != null && textureIds[albedoIdx]) {
     props.mainTexture = texRef(textureIds[albedoIdx]);
@@ -1354,6 +1433,14 @@ function importGltf(assetPath, libraryRoot) {
   }
 
   // --- materials ---
+  const vertexColorMats = new Set();
+  for (const mesh of meshes) {
+    for (const p of mesh.primitives || []) {
+      if (p.attributes && p.attributes.COLOR_0 != null) {
+        vertexColorMats.add(p.material != null ? p.material : 0);
+      }
+    }
+  }
   for (let i = 0; i < Math.max(materials.length, 1); i++) {
     const mat = materials[i] || { name: 'Material' };
     const name = `${mat.name || `material_${i}`}.material`;
@@ -1371,7 +1458,10 @@ function importGltf(assetPath, libraryRoot) {
       files: ['.json'],
       subMetas: {},
     };
-    if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), materialJson(mat, textureIds))) {
+    if (writeJsonIfChanged(
+      path.join(dir, `${subUuid}.json`),
+      materialJson(mat, textureIds, { useVertexColor: vertexColorMats.has(i) }),
+    )) {
       changed.push(`${subUuid}.json`);
     }
     materialIds.push(subUuid);
