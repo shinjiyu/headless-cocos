@@ -1,0 +1,23 @@
+services:
+  cocos-preview-playable:
+    image: cocos-headless-preview:latest
+    container_name: cocos-preview-playable
+    ports:
+      - "7462:7462"
+    volumes:
+      - "d:/workspace/playableAdFramework-backup:/workspace"
+    environment:
+      # creator mode: serve the project's already-built preview chunks +
+      # import-map verbatim (no mini rebuild, no chunk-hash parity concern).
+      # This is the highest-fidelity "does the mirror reproduce Creator's
+      # preview" test.
+      PACKER: creator
+      PORT: 7462
+      PROJECT: /workspace
+      NPM_ROOT: /app/node_modules
+      UUID_UTIL: /app/vendor-utils/dist/uuid.js
+      ENGINE_SNAPSHOT: /engine
+      LAUNCH_SCENE: "Main"
+      WATCH_POLL: "1"
+      WATCH_POLL_MS: "800"
+    restart: unless-stopped

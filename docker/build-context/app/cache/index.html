@@ -1,0 +1,359 @@
+<html>
+    <head>
+        <link rel="icon" href="./favicon.ico" />
+        <meta charset="utf-8" />
+        <title>Cocos Creator - baseAIAutoCocos</title>
+        <meta
+            name="viewport"
+            content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,minimal-ui=true"
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="full-screen" content="yes" />
+        <meta name="screen-orientation" content="portrait" />
+        <meta name="x5-fullscreen" content="true" />
+        <meta name="360-fullscreen" content="true" />
+        <meta name="renderer" content="webkit" />
+        <meta name="force-rendering" content="webkit" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+        <link rel="stylesheet" type="text/css" href="./index.css" />
+    </head>
+    <body style="overflow: hidden;">
+        <div class="toolbar disabled">
+    <div class="item">
+        <div id="view-select" class="view-select-container" value="WebpageFullScreen" tabindex="-1">
+            <div class="view-select">
+                <div class="label">
+                    <span id="name"></span>
+                </div>
+                <i class="arrow-triangle"></i>
+            </div>
+            <div class="options">
+                <ul>
+                    
+                        
+                            <li class="" data-device="Default">
+                                设计分辨率 (1280X720)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="FullScreen">
+                                全屏
+                            </li>
+                        
+                    
+                        
+                            <li class="selected" data-device="WebpageFullScreen">
+                                网页全屏
+                            </li>
+                        
+                    
+                        
+                            <li class="separator"></li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPhone 14 Pro">
+                                Apple iPhone 14 Pro (393X852)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPhone 12/13 Pro Max; 14 Plus">
+                                Apple iPhone 12/13 Pro Max; 14 Plus (428X926)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPhone 12; 13; 14; 12/13 Pro">
+                                Apple iPhone 12; 13; 14; 12/13 Pro (390X844)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPhone X; XS; 11 Pro; 12/13 Mini">
+                                Apple iPhone X; XS; 11 Pro; 12/13 Mini (375X812)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPhone XR; 11">
+                                Apple iPhone XR; 11 (414X896)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPad 10.2">
+                                Apple iPad 10.2 (1620X2160)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPad Air 10.9">
+                                Apple iPad Air 10.9 (1640X2360)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Apple iPad Pro 10.5">
+                                Apple iPad Pro 10.5 (1668X2224)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="OPPO Reno 2">
+                                OPPO Reno 2 (360X800)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="HUAWEI Nova 5">
+                                HUAWEI Nova 5 (360X780)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="HONOR X8">
+                                HONOR X8 (360X796)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="HUAWEI Nova 8i">
+                                HUAWEI Nova 8i (360X792)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="HUAWEI Mate 40 Pro">
+                                HUAWEI Mate 40 Pro (448X924)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="HUAWEI Mate30 Pro">
+                                HUAWEI Mate30 Pro (392X800)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Xiaomi Redmi 8">
+                                Xiaomi Redmi 8 (360X760)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Sony Xperia 5">
+                                Sony Xperia 5 (360X840)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="OPPO A77">
+                                OPPO A77 (360X806)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Nokia C2">
+                                Nokia C2 (360X720)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Asus ROG Phone 6">
+                                Asus ROG Phone 6 (360X816)
+                            </li>
+                        
+                    
+                        
+                            <li class="" data-device="Lenovo Legion 2 Pro">
+                                Lenovo Legion 2 Pro (360X820)
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="item"><button id="btn-rotate" class="checked">Rotate</button></div>
+    <span style="font-size: small;" class="item">Debug Mode:</span>
+    <div class="item">
+        <select id="opts-debug-mode" value="INFO">
+            <option value="NONE">None</option>
+            <option value="VERBOSE">Verbose</option>
+            <option value="INFO">Info</option>
+            <option value="WARN">Warn</option>
+            <option value="ERROR">Error</option>
+            <option value="INFO_FOR_WEB_PAGE">Info For Web Page</option>
+            <option value="WARN_FOR_WEB_PAGE">Warn For Web Page</option>
+            <option value="ERROR_FOR_WEB_PAGE">Error For Web Page</option>
+        </select>
+    </div>
+    <div class="item"><button id="btn-show-fps" class="checked">Show FPS</button></div>
+    <div class="item">
+        <span style="font-size: small;" class="item">FPS:</span><input id="input-set-fps" type="number" value="60" />
+    </div>
+    <div style="margin-right: 0;" class="item"><button id="btn-pause">Pause</button><button id="btn-step">Step</button></div>
+    <div class="item"><button id="btn-step" style="display: none;">Step</button></div>
+    <div id="step-length">
+        <span>Step Length: </span>
+        <input type="text" value="1">
+        <span>ms</span>
+    </div>
+</div>
+
+        <div id="content" class="content" style="overflow: hidden;">
+            <div class="contentWrap">
+                <div id="GameDiv" class="wrapper">
+                    <div id="Cocos3dGameContainer">
+                        <canvas id="GameCanvas" tabindex="-1" style="background-color: '';"></canvas>
+                    </div>
+                    <div id="splash">
+                        <div class="progress-bar stripes"><span></span></div>
+                    </div>
+                    <div id="bulletin">
+                        <div id="sceneIsEmpty" class="inner">预览场景中啥都没有，加点什么，或在编辑器中打开其它场景吧</div>
+                    </div>
+                    <div class="error" id="error">
+                        <div class="title">Error <i>(Please open the console to see detailed errors)</i></div>
+                        <div class="error-main"></div>
+                        <div class="error-stack"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+    try {
+        // 在启动加载之前先初始化显示错误遮罩的相关代码，才能更好的提示后续启动过程中可能出现的错误
+        // 3.6.0 之前的预览模板只有 error-main
+        const errorMain = document.querySelector('#error .error-main');
+        const errorStack = document.querySelector('#error .error-stack');
+        const errorWrap = document.querySelector('#error');
+        function transToErrorInfo(error) {
+            const errorInfo = {
+                message: '',
+                stack: '',
+            };
+            if (error instanceof ErrorEvent) {
+                errorInfo.message = error.error.message;
+                errorInfo.stack = error.error.stack;
+            }
+            else if (error instanceof PromiseRejectionEvent) {
+                errorInfo.message = error.reason;
+            }
+            else if (error instanceof Event && error.target && error.target.src) {
+                errorInfo.message = `Get ${error.target.src} failed!`;
+            } else {
+                errorInfo.message = error.message;
+                errorInfo.stack = error.stack;
+            }
+            return errorInfo;
+        }
+        function showError(errorInfo, message) {
+            if (!errorWrap) {
+                return;
+            }
+            message = message || '[Browser Preview]' + errorInfo.message + (errorInfo.stack ? '/n' + errorInfo.stack : '');
+            if (errorStack) {
+                errorMain.innerText = errorInfo.message;
+                errorInfo.stack && (errorStack.innerText = errorInfo.stack);
+            }
+            else {
+                // 兼容 3.6.0 之前的预览模板
+                errorMain.innerText = message;
+            }
+            errorWrap.style.display = 'block';
+            return {
+                errorInfo,
+                message,
+            };
+        }
+        window.__errorTools = {
+            transToErrorInfo,
+            showError,
+        }
+        function installDiagnosisRoutine() {
+            const errorHandle = function(error) {
+                if (error.message && error.message.includes('debug-evaluate')) {
+                    return;
+                }
+                console.error(error);
+                showError(transToErrorInfo(error));
+                // 注意，在返回 true 的时候，异常才不会继续向上抛出error;
+                return true;
+            };
+            // 全局捕获错误
+            window.addEventListener(
+                'error',
+                errorHandle,
+                true,
+            );
+            window.addEventListener(
+                'unhandledrejection',
+                (error) => {
+                    console.error(error);
+                    showError(transToErrorInfo(error));
+                },
+                true,
+            );
+        }
+        installDiagnosisRoutine();
+    }
+    catch (error) {
+        console.error(error);
+    }
+</script>
+<!-- v-console Support.(Optional) -->
+
+
+<!-- Polyfills bundle. -->
+<script src="/scripting/polyfills/bundle.js"></script>
+
+<!-- Import map that map the engine feature unit modules. -->
+<script src="/scripting/engine/bin/.cache/dev/preview/import-map.json" type="systemjs-importmap"></script>
+
+<!-- Import map that map the entry of project module(s). -->
+<script src="/scripting/x/import-map.json" type="systemjs-importmap"></script>
+
+<!-- Import map that map 'cc', 'cc/env'. -->
+<script src="/scripting/import-map-global" type="systemjs-importmap"></script>
+
+<!-- SystemJS support. -->
+<script src="/scripting/systemjs/system.js"></script>
+
+<!-- Setup the detailed resolution. -->
+<script>
+    System.setResolutionDetailMapCallback(function() {
+        var url = new URL('/scripting/x/resolution-detail-map.json', window.location);
+        return fetch(url).then(function (response) {
+            return response.json();
+        }).then(function (json) {
+            return { json, url: url.href };
+        });
+    });
+</script>
+
+<script src="/scripting/engine/bin/.cache/dev/preview/bundled/index.js"></script>
+
+<!-- Manifest file. -->
+<script name="setting" src="/settings.js?scene=current_scene"></script>
+
+<script>
+    window.onload = function() {
+        System.import("/preview-app/index.js").then(function (mod) {
+            return mod.bootstrap({
+                engineBaseUrl: '/scripting/engine',
+                settings: window._CCSettings,
+                devices: {"Default":{"name":"设计分辨率","width":1280,"height":720,"ratio":1},"FullScreen":{"name":"全屏"},"WebpageFullScreen":{"name":"网页全屏"},"__separator__":{"name":"__separator__"},"Apple iPhone 14 Pro":{"name":"Apple iPhone 14 Pro","width":393,"height":852,"ratio":3,"enable":true},"Apple iPhone 12/13 Pro Max; 14 Plus":{"name":"Apple iPhone 12/13 Pro Max; 14 Plus","width":428,"height":926,"ratio":3,"enable":true},"Apple iPhone 12; 13; 14; 12/13 Pro":{"name":"Apple iPhone 12; 13; 14; 12/13 Pro","width":390,"height":844,"ratio":3,"enable":true},"Apple iPhone X; XS; 11 Pro; 12/13 Mini":{"name":"Apple iPhone X; XS; 11 Pro; 12/13 Mini","width":375,"height":812,"ratio":3,"enable":true},"Apple iPhone XR; 11":{"name":"Apple iPhone XR; 11","width":414,"height":896,"ratio":2,"enable":true},"Apple iPad 10.2":{"name":"Apple iPad 10.2","width":1620,"height":2160,"ratio":0,"enable":true},"Apple iPad Air 10.9":{"name":"Apple iPad Air 10.9","width":1640,"height":2360,"ratio":0,"enable":true},"Apple iPad Pro 10.5":{"name":"Apple iPad Pro 10.5","width":1668,"height":2224,"ratio":0,"enable":true},"OPPO Reno 2":{"name":"OPPO Reno 2","width":360,"height":800,"ratio":3,"enable":true},"HUAWEI Nova 5":{"name":"HUAWEI Nova 5","width":360,"height":780,"ratio":3,"enable":true},"HONOR X8":{"name":"HONOR X8","width":360,"height":796,"ratio":3,"enable":true},"HUAWEI Nova 8i":{"name":"HUAWEI Nova 8i","width":360,"height":792,"ratio":3,"enable":true},"HUAWEI Mate 40 Pro":{"name":"HUAWEI Mate 40 Pro","width":448,"height":924,"ratio":3,"enable":true},"HUAWEI Mate30 Pro":{"name":"HUAWEI Mate30 Pro","width":392,"height":800,"ratio":3,"enable":true},"Xiaomi Redmi 8":{"name":"Xiaomi Redmi 8","width":360,"height":760,"ratio":2,"enable":true},"Sony Xperia 5":{"name":"Sony Xperia 5","width":360,"height":840,"ratio":3,"enable":true},"OPPO A77":{"name":"OPPO A77","width":360,"height":806,"ratio":2,"enable":true},"Nokia C2":{"name":"Nokia C2","width":360,"height":720,"ratio":2,"enable":true},"Asus ROG Phone 6":{"name":"Asus ROG Phone 6","width":360,"height":816,"ratio":3,"enable":true},"Lenovo Legion 2 Pro":{"name":"Lenovo Legion 2 Pro","width":360,"height":820,"ratio":3,"enable":true}},
+            });
+        }).catch(function(err) {
+            console.error(err);
+        });
+    };
+</script>
+
+    </body>
+</html>

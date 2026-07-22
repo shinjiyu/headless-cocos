@@ -1,0 +1,32 @@
+services:
+  cocos-preview:
+    image: cocos-headless-preview:latest
+    build:
+      context: ./build-context
+    container_name: cocos-preview
+    ports:
+      - "7460:7460"
+    volumes:
+      # Bind the Cocos project so file edits on the host trigger HMR inside.
+      # On Docker Desktop for Windows/macOS, native fs.watch events don't cross
+      # the VM boundary — WATCH_POLL=1 below adds a polling scan that does.
+      - "d:/tempWorkspace/baseAIAutoCocos:/workspace"
+    environment:
+      PACKER: mini
+      PORT: 7460
+      PROJECT: /workspace
+      NPM_ROOT: /app/node_modules
+      UUID_UTIL: /app/vendor-utils/dist/uuid.js
+      ENGINE_SNAPSHOT: /engine
+      # Force mini-packer to hash chunks against the Windows-style file:// URL
+      # (i.e. the same URL Creator used when it produced this project's
+      # preview/import-map.json). Without this the container's chunks would
+      # live at Linux-derived hashes (e.g. sha1("file:///workspace/…")) and
+      # the overlay would never fire. Only meaningful when the workspace
+      # started life on a Windows host; adjust for other setups.
+      PROJECT_URL: "file:///D:/tempWorkspace/baseAIAutoCocos"
+      # Docker Desktop for Windows/macOS: bind-mount fs events don't cross the
+      # VM boundary, so pair native fs.watch with a polling scan.
+      WATCH_POLL: "1"
+      WATCH_POLL_MS: "800"
+    restart: unless-stopped
