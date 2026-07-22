@@ -8,9 +8,10 @@
  * [/ TANGENT] [/ JOINTS+WEIGHTS top-4] [/ morph] [/ sparse] [/ meshopt] [/ Draco]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
  * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + sheen→fabric +
- * variants (import-time bake) + unlit + emissive_strength + ior/specular + anisotropy),
+ * transmission→glass (approx) + variants (import-time bake) + unlit +
+ * emissive_strength + ior/specular + anisotropy),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
- * No lights / cameras (Creator also skips). Transmission still out of scope.
+ * No lights / cameras (Creator also skips).
  */
 
 const crypto = require('crypto');
@@ -26,6 +27,8 @@ const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
 const CAR_PAINT_EFFECT = '304a12db-3955-46e4-b712-e5e26f45258b';
 // advanced/fabric.effect — used when KHR_materials_sheen is present
 const FABRIC_EFFECT = 'b25c7601-1d07-4a56-86c5-62e83ea7c61e';
+// advanced/glass.effect — approximate KHR_materials_transmission (+ volume/ior)
+const GLASS_EFFECT = 'f288f946-150b-443d-b4b3-0227c5117c93';
 // builtin-unlit.effect — used when KHR_materials_unlit is present
 const UNLIT_EFFECT = 'a3cd009f-0ab0-420d-9278-b9fdab939bbc';
 
@@ -1822,6 +1825,7 @@ function materialJsonUnlit(mat, textureIds, options = {}) {
  *   KHR_texture_transform on baseColor → tilingOffset
  *   KHR_materials_clearcoat → car-paint effect + coatRoughness / coatIntensity
  *   KHR_materials_sheen → fabric effect + sheenColor / sheenRoughness
+ *   KHR_materials_transmission → glass effect (approx; + volume/ior → F0/gradient)
  *   KHR_materials_emissive_strength → emissiveScale
  *   KHR_materials_ior / specular → specularIntensity
  *   KHR_materials_anisotropy → IS_ANISOTROPY + anisotropyIntensity/Rotation
@@ -1947,10 +1951,13 @@ function materialJson(mat, textureIds, options = {}) {
     defines[0].HAS_SECOND_UV = true;
   }
 
-  // KHR_materials_clearcoat → car-paint; else KHR_materials_sheen → fabric
+  // clearcoat → car-paint; else sheen → fabric; else transmission → glass
   const clearcoat =
     mat.extensions && mat.extensions.KHR_materials_clearcoat;
   const sheen = mat.extensions && mat.extensions.KHR_materials_sheen;
+  const transmission =
+    mat.extensions && mat.extensions.KHR_materials_transmission;
+  let usedGlass = false;
   if (clearcoat) {
     effectUuid = CAR_PAINT_EFFECT;
     // Drop emissive / anisotropy — car-paint has no those paths
@@ -2020,13 +2027,82 @@ function materialJson(mat, textureIds, options = {}) {
       props.sheenDataMap = texRef(textureIds[sheenRoughTex.index]);
       defines[0].USE_SHEEN_DATA_MAP = true;
     }
+  } else if (transmission) {
+    // Stylized glass — not path-traced transmission / refraction.
+    effectUuid = GLASS_EFFECT;
+    usedGlass = true;
+    delete defines[0].USE_EMISSIVE_MAP;
+    delete defines[0].EMISSIVE_UV;
+    delete defines[0].IS_ANISOTROPY;
+    delete defines[0].USE_ANISOTROPY_MAP;
+    delete defines[0].USE_OCCLUSION_MAP;
+    delete defines[0].HAS_SECOND_UV;
+    delete props.emissiveMap;
+    delete props.emissive;
+    delete props.emissiveScale;
+    delete props.anisotropyIntensity;
+    delete props.anisotropyRotation;
+    delete props.anisotropyMap;
+    delete props.occlusionMap;
+    delete props.occlusion;
+    delete props.metallic;
+
+    const iorExt = mat.extensions && mat.extensions.KHR_materials_ior;
+    const ior = iorExt && iorExt.ior != null ? iorExt.ior : 1.5;
+    // glass.effect F0 default 0.5 ≈ F0(1.5)/0.08
+    let f0 = f0FromIor(ior) / 0.08;
+    if (f0 < 0) f0 = 0;
+    if (f0 > 1) f0 = 1;
+    props.F0 = f0;
+    props.F90 = Math.min(1, f0 + 0.4);
+
+    const tf =
+      transmission.transmissionFactor != null ? transmission.transmissionFactor : 0;
+    // Higher transmission → slightly darker tint (glass default ~0.05 gray)
+    const tint = Math.max(0.02, 1 - tf * 0.85);
+    const base = pbr.baseColorFactor || [1, 1, 1, 1];
+    props.mainColor = colorFromFactor(
+      [
+        (base[0] != null ? base[0] : 1) * tint,
+        (base[1] != null ? base[1] : 1) * tint,
+        (base[2] != null ? base[2] : 1) * tint,
+        1,
+      ],
+      [tint, tint, tint, 1],
+    );
+
+    const volume = mat.extensions && mat.extensions.KHR_materials_volume;
+    if (volume) {
+      const att = Array.isArray(volume.attenuationColor)
+        ? volume.attenuationColor
+        : [1, 1, 1];
+      props.gradientColor = colorFromFactor(
+        [att[0] != null ? att[0] : 1, att[1] != null ? att[1] : 1, att[2] != null ? att[2] : 1, 1],
+        [1, 1, 1, 1],
+      );
+      defines[0].USE_GRADIENT_COLOR = true;
+      let gi = 0.2;
+      if (volume.thicknessFactor != null) {
+        gi = Math.min(1, Math.max(0, volume.thicknessFactor));
+      }
+      props.gradientIntensity = gi;
+    }
   }
 
   if (mat.alphaMode === 'MASK') {
     props.alphaThreshold = mat.alphaCutoff != null ? mat.alphaCutoff : 0.5;
   }
 
-  const { cullMode, techIdx, blendState, depthStencilState } = materialAlphaAndCull(mat, defines);
+  let { cullMode, techIdx, blendState, depthStencilState } = materialAlphaAndCull(mat, defines);
+  if (usedGlass) {
+    // glass techniques: 0=single-sided, 1=two-sided (blend/depth baked in effect)
+    techIdx = mat.doubleSided ? 1 : 0;
+    cullMode = mat.doubleSided ? 0 : 1;
+    blendState = { targets: [{}] };
+    depthStencilState = {};
+    delete defines[0].USE_ALPHA_TEST;
+    delete defines[0].USE_TWOSIDE;
+  }
 
   return {
     __type__: 'cc.Material',
@@ -2484,6 +2560,7 @@ module.exports = {
   STANDARD_EFFECT,
   CAR_PAINT_EFFECT,
   FABRIC_EFFECT,
+  GLASS_EFFECT,
   UNLIT_EFFECT,
   prepareMeshopt,
   prepareDraco,

@@ -7,7 +7,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | Supported | Not yet / out of scope |
 |-----------|------------------------|
 | `.gltf` + external `.bin` / images | Cameras / lights (**Creator also skips** — not planned) |
-| `.glb` (JSON + BIN chunks) | **KHR_materials_transmission** (no builtin effect) |
+| `.glb` (JSON + BIN chunks) | |
 | **Multi-buffer** (external bins flattened to buffer 0) | |
 | `.fbx` via Creator `FBX2glTF` → glTF | |
 | **EXT_/KHR_meshopt_compression** (`meshoptimizer`) | |
@@ -19,6 +19,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | **KHR_texture_transform** → `tilingOffset` | |
 | **KHR_materials_clearcoat** → `car-paint` effect | |
 | **KHR_materials_sheen** → `fabric` effect | |
+| **KHR_materials_transmission** → `glass` effect (approx + volume/ior) | |
 | **KHR_materials_variants** (import-time bake via `options.variant`) | |
 | **KHR_materials_unlit** → `builtin-unlit` | |
 | **KHR_materials_emissive_strength** → `emissiveScale` | |
@@ -43,7 +44,7 @@ Root meta: `importer: "gltf"` (or `"fbx"`), `files: []`.
 |-----|----------|-------|
 | mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive; optional color/uv1; skinned stride 72+; morph deltas) |
 | texture | `texture` | `.json` |
-| material | `gltf-material` | `.json` (standard / **unlit** / **car-paint** / **fabric**; UV sets; texture_transform; MASK/BLEND) |
+| material | `gltf-material` | `.json` (standard / **unlit** / **car-paint** / **fabric** / **glass**; UV sets; texture_transform; MASK/BLEND) |
 | skeleton (per skin) | `gltf-skeleton` | `.json` (`_joints` paths + `_bindposes`) |
 | animation (per clip) | `gltf-animation` | `.bin` only (CCON v2 ExoticAnimation) |
 | scene | `gltf-scene` | hierarchy prefab + `Animation` / `SkeletalAnimation` |
@@ -64,7 +65,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-sheen.cjs`, `e2e-gltf-variants.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-gltf-joints1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-sheen.cjs`, `e2e-gltf-transmission.cjs`, `e2e-gltf-variants.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-gltf-joints1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -82,6 +83,7 @@ node .\spike\e2e-gltf-color-uv1.cjs
 node .\spike\e2e-gltf-uv1-transform.cjs
 node .\spike\e2e-gltf-clearcoat.cjs
 node .\spike\e2e-gltf-sheen.cjs
+node .\spike\e2e-gltf-transmission.cjs
 node .\spike\e2e-gltf-variants.cjs
 node .\spike\e2e-gltf-unlit.cjs
 node .\spike\e2e-gltf-emissive-strength.cjs
@@ -144,6 +146,14 @@ Sheen (`fixtures/gltf-sheen/sheen.gltf`):
 - `sheenColorFactor` → `sheenColor`; `sheenRoughnessFactor` → `sheenRoughness`
 - Optional `sheenColorTexture` / `sheenRoughnessTexture` → `USE_SHEEN_COLOR_MAP` / `USE_SHEEN_DATA_MAP`
 - Clearcoat wins if both extensions are present
+
+Transmission (`fixtures/gltf-transmission/transmission.gltf`):
+
+- `KHR_materials_transmission` → effect `glass` (`f288f946-…`, stylized — not path-traced)
+- `KHR_materials_ior` → `F0` / `F90` (F0 ≈ F0(ior)/0.08)
+- `KHR_materials_volume` attenuationColor / thicknessFactor → `gradientColor` / `gradientIntensity`
+- `doubleSided` → glass technique 1 (two-sided)
+- Priority: clearcoat > sheen > transmission
 
 Variants (`fixtures/gltf-variants/variants.gltf`):
 
