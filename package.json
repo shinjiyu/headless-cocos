@@ -12,5 +12,8 @@
   "type": "commonjs",
   "devDependencies": {
     "@electron/asar": "^4.2.0"
+  },
+  "dependencies": {
+    "meshoptimizer": "^1.2.0"
   }
 }

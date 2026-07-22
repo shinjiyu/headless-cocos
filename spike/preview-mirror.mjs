@@ -81,7 +81,7 @@ const { BMFONT_EXTS, importBMFont } = bmfontImporter;
 const { importSpine, importSpineBinary, isSpineJson } = spineImporter;
 const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
-const { GLTF_EXTS, importGltf } = gltfImporter;
+const { GLTF_EXTS, importGltf, prepareMeshopt } = gltfImporter;
 const { FBX_EXTS, importFbx } = fbxImporter;
 const { fetchModel, listModels } = polyhavenImporter;
 
@@ -1617,13 +1617,19 @@ server.on('upgrade', (req, socket, head) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log('[preview-mirror] http://127.0.0.1:' + PORT);
   console.log('  PROJECT=' + PROJECT);
   console.log('  PACK=' + PACK_PREVIEW);
   console.log('  ENGINE=' + ENGINE_PREVIEW);
   console.log('  UPSTREAM=' + (UPSTREAM || '(none)'));
   console.log('  HMR=ws://127.0.0.1:' + PORT + '/__hmr  (open WITHOUT autoReload=false)');
+  try {
+    await prepareMeshopt();
+    console.log('[meshopt] decoder ready');
+  } catch (err) {
+    console.warn('[meshopt] optional decoder unavailable:', err.message);
+  }
   if (WATCH) {
     if (PACKER === 'mini') {
       // Headless mode: don't reload directly on packer/asset-db (Creator's outputs

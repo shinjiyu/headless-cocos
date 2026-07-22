@@ -5,12 +5,12 @@
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
- * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT] [/ sparse]),
+ * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph] [/ sparse] [/ meshopt]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
  * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit +
  * emissive_strength + ior/specular + anisotropy),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
- * No lights / cameras (Creator also skips). Transmission still out of scope.
+ * No lights / cameras (Creator also skips). Transmission / Draco still out of scope.
  */
 
 const crypto = require('crypto');
@@ -102,31 +102,187 @@ function parseGlb(buf) {
     offset = end;
   }
   if (!json) throw new Error('GLB missing JSON chunk');
-  return { json, bin };
+  const doc = { json, bin, buffers: [bin] };
+  return decodeMeshoptViews(doc);
+}
+
+function loadBufferUri(assetPath, bufDesc) {
+  if (!bufDesc) return Buffer.alloc(0);
+  if (bufDesc.uri) {
+    if (bufDesc.uri.startsWith('data:')) {
+      const m = bufDesc.uri.match(/^data:[^;]+;base64,(.+)$/);
+      if (!m) throw new Error('unsupported data URI buffer');
+      return Buffer.from(m[1], 'base64');
+    }
+    return fs.readFileSync(path.join(path.dirname(assetPath), bufDesc.uri));
+  }
+  // GLB BIN chunk already assigned externally
+  return Buffer.alloc(bufDesc.byteLength || 0);
 }
 
 function loadGltf(assetPath) {
   const ext = path.extname(assetPath).toLowerCase();
   if (ext === '.glb') return parseGlb(fs.readFileSync(assetPath));
   const json = JSON.parse(fs.readFileSync(assetPath, 'utf8'));
-  let bin = Buffer.alloc(0);
-  const buf0 = json.buffers && json.buffers[0];
-  if (buf0 && buf0.uri) {
-    if (buf0.uri.startsWith('data:')) {
-      const m = buf0.uri.match(/^data:[^;]+;base64,(.+)$/);
-      if (!m) throw new Error('unsupported data URI buffer');
-      bin = Buffer.from(m[1], 'base64');
-    } else {
-      bin = fs.readFileSync(path.join(path.dirname(assetPath), buf0.uri));
-    }
+  const buffers = (json.buffers || []).map((b) => loadBufferUri(assetPath, b));
+  const bin = buffers[0] || Buffer.alloc(0);
+  const doc = { json, bin, buffers };
+  return decodeMeshoptViews(doc);
+}
+
+// ---- meshopt (EXT_/KHR_meshopt_compression) ----
+let _meshoptDecoder = null;
+
+/** Await once before importing meshopt-compressed glTFs (sync importGltf needs it ready). */
+async function prepareMeshopt() {
+  if (_meshoptDecoder) return _meshoptDecoder;
+  let MeshoptDecoder;
+  try {
+    ({ MeshoptDecoder } = require('meshoptimizer'));
+  } catch (err) {
+    throw new Error('meshoptimizer package required for meshopt glTFs: npm i meshoptimizer');
   }
-  return { json, bin };
+  await MeshoptDecoder.ready;
+  if (!MeshoptDecoder.supported) throw new Error('MeshoptDecoder not supported in this runtime');
+  _meshoptDecoder = MeshoptDecoder;
+  return _meshoptDecoder;
+}
+
+function requireMeshoptDecoder() {
+  if (_meshoptDecoder) return _meshoptDecoder;
+  throw new Error(
+    'meshopt-compressed glTF: call await prepareMeshopt() before importGltf (or importGltfAsync)',
+  );
+}
+
+function meshoptExt(view) {
+  const exts = view && view.extensions;
+  if (!exts) return null;
+  return exts.EXT_meshopt_compression || exts.KHR_meshopt_compression || null;
+}
+
+function getDocBuffer(doc, index) {
+  const i = index || 0;
+  if (doc.buffers && doc.buffers[i]) return doc.buffers[i];
+  if (i === 0 && doc.bin) return doc.bin;
+  throw new Error(`missing buffer ${i}`);
+}
+
+/**
+ * Expand meshopt-compressed bufferViews into a plain buffer 0 so accessors
+ * can read densely. No-op when extension absent.
+ */
+function decodeMeshoptViews(doc) {
+  const views = doc.json.bufferViews || [];
+  if (!views.some((v) => meshoptExt(v))) return doc;
+
+  const Decoder = requireMeshoptDecoder();
+  const parts = [];
+  let offset = 0;
+
+  for (const view of views) {
+    const pad = (4 - (offset % 4)) % 4;
+    if (pad) {
+      parts.push(Buffer.alloc(pad));
+      offset += pad;
+    }
+    const ext = meshoptExt(view);
+    let bytes;
+    if (ext) {
+      const srcBuf = getDocBuffer(doc, ext.buffer);
+      const srcOff = ext.byteOffset || 0;
+      const src = new Uint8Array(srcBuf.buffer, srcBuf.byteOffset + srcOff, ext.byteLength);
+      const stride = ext.byteStride || 0;
+      if (!stride || !ext.count) throw new Error('meshopt view missing byteStride/count');
+      const dst = new Uint8Array(ext.count * stride);
+      Decoder.decodeGltfBuffer(
+        dst,
+        ext.count,
+        stride,
+        src,
+        ext.mode,
+        ext.filter || 'NONE',
+      );
+      bytes = Buffer.from(dst.buffer, dst.byteOffset, dst.byteLength);
+      if (view.extensions) {
+        delete view.extensions.EXT_meshopt_compression;
+        delete view.extensions.KHR_meshopt_compression;
+        if (!Object.keys(view.extensions).length) delete view.extensions;
+      }
+    } else {
+      const srcBuf = getDocBuffer(doc, view.buffer);
+      const start = view.byteOffset || 0;
+      const len = view.byteLength != null ? view.byteLength : 0;
+      bytes = Buffer.from(srcBuf.buffer, srcBuf.byteOffset + start, len);
+    }
+    view.buffer = 0;
+    view.byteOffset = offset;
+    view.byteLength = bytes.length;
+    parts.push(bytes);
+    offset += bytes.length;
+  }
+
+  const bin = parts.length ? Buffer.concat(parts) : Buffer.alloc(0);
+  doc.bin = bin;
+  doc.buffers = [bin];
+  doc.json.buffers = [{ byteLength: bin.length }];
+  return doc;
+}
+
+/** Async import that prepares meshopt first. */
+async function importGltfAsync(assetPath, libraryRoot, options) {
+  const peekExt = path.extname(assetPath).toLowerCase();
+  let needsMeshopt = false;
+  try {
+    if (peekExt === '.glb') {
+      const { json } = parseGlbRaw(fs.readFileSync(assetPath));
+      needsMeshopt = (json.bufferViews || []).some((v) => meshoptExt(v));
+    } else {
+      const json = JSON.parse(fs.readFileSync(assetPath, 'utf8'));
+      needsMeshopt = (json.bufferViews || []).some((v) => meshoptExt(v));
+    }
+  } catch {
+    needsMeshopt = true; // prepare anyway if peek fails
+  }
+  if (needsMeshopt) await prepareMeshopt();
+  return importGltf(assetPath, libraryRoot, options);
+}
+
+/** Parse GLB without meshopt expand (for peeking). */
+function parseGlbRaw(buf) {
+  if (buf.length < 12 || buf.toString('utf8', 0, 4) !== 'glTF') {
+    throw new Error('invalid GLB magic');
+  }
+  const version = buf.readUInt32LE(4);
+  if (version !== 2) throw new Error(`unsupported GLB version ${version}`);
+  let offset = 12;
+  let json = null;
+  let bin = Buffer.alloc(0);
+  while (offset + 8 <= buf.length) {
+    const length = buf.readUInt32LE(offset);
+    const type = buf.readUInt32LE(offset + 4);
+    const start = offset + 8;
+    const end = start + length;
+    if (end > buf.length) throw new Error('GLB chunk truncated');
+    const chunk = buf.slice(start, end);
+    if (type === 0x4e4f534a) json = JSON.parse(chunk.toString('utf8'));
+    else if (type === 0x004e4942) bin = chunk;
+    offset = end;
+  }
+  if (!json) throw new Error('GLB missing JSON chunk');
+  return { json, bin, buffers: [bin] };
 }
 
 function bufferViewByteBase(doc, bufferViewIndex, byteOffset = 0) {
   const view = doc.json.bufferViews[bufferViewIndex];
   if (!view) throw new Error(`missing bufferView ${bufferViewIndex}`);
-  if ((view.buffer || 0) !== 0) throw new Error('only buffer 0 supported');
+  const buf = getDocBuffer(doc, view.buffer);
+  // Absolute offset into the Node Buffer that backs this view's buffer index.
+  // After meshopt expand, everything lives in buffers[0] === bin.
+  if (buf !== doc.bin && buf !== (doc.buffers && doc.buffers[0])) {
+    // Multi-buffer sparse before expand is unsupported; expand meshopt first.
+    throw new Error('sparse/accessor read requires buffer 0 (decode meshopt first)');
+  }
   return (view.byteOffset || 0) + (byteOffset || 0);
 }
 
@@ -1917,7 +2073,9 @@ module.exports = {
   STANDARD_EFFECT,
   CAR_PAINT_EFFECT,
   UNLIT_EFFECT,
+  prepareMeshopt,
   importGltf,
+  importGltfAsync,
   loadGltf,
   parseGlb,
 };

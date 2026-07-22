@@ -8,7 +8,8 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 |-----------|------------------------|
 | `.gltf` + external `.bin` / images | Cameras / lights (**Creator also skips** — not planned) |
 | `.glb` (JSON + BIN chunks) | **KHR_materials_transmission** (no builtin effect) |
-| `.fbx` via Creator `FBX2glTF` → glTF | |
+| `.fbx` via Creator `FBX2glTF` → glTF | **Draco** (not yet) |
+| **EXT_/KHR_meshopt_compression** (`meshoptimizer`) | |
 | POSITION / NORMAL / TEXCOORD_0 [/ **TEXCOORD_1**] / TANGENT | |
 | **Sparse accessors** (incl. no bufferView) | |
 | **COLOR_0** (+ `USE_VERTEX_COLOR`) | |
@@ -59,7 +60,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -80,9 +81,12 @@ node .\spike\e2e-gltf-unlit.cjs
 node .\spike\e2e-gltf-emissive-strength.cjs
 node .\spike\e2e-gltf-ior-anisotropy.cjs
 node .\spike\e2e-gltf-sparse.cjs
+node .\spike\e2e-gltf-meshopt.cjs
 node .\spike\e2e-polyhaven.cjs
 node .\spike\e2e-fbx.cjs
 ```
+
+Meshopt: `npm i meshoptimizer`, then `await prepareMeshopt()` (or use `importGltfAsync`) before importing compressed assets. Mirror boots the decoder automatically.
 
 Ground truth (`character-a.glb` from selfGame / Kenney):
 
@@ -143,3 +147,8 @@ IOR / specular / anisotropy (`fixtures/gltf-ior-anisotropy/ior-anisotropy.gltf`)
 Sparse (`fixtures/gltf-sparse/sparse.gltf`):
 
 - Dense base + `accessor.sparse` overlay; also bufferView-less sparse-only accessors
+
+Meshopt (`fixtures/gltf-meshopt/meshopt.gltf`):
+
+- `EXT_meshopt_compression` on attribute + TRIANGLES index bufferViews
+- Requires `meshoptimizer` + `prepareMeshopt()` / `importGltfAsync`
