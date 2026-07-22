@@ -22,7 +22,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | **KHR_materials_emissive_strength** → `emissiveScale` | |
 | **KHR_materials_ior** / **specular** → `specularIntensity` | |
 | **KHR_materials_anisotropy** → `IS_ANISOTROPY` | |
-| **JOINTS_0 / WEIGHTS_0** + `gltf-skeleton` | |
+| **JOINTS_0 / WEIGHTS_0** [+ **JOINTS_n / WEIGHTS_n** → top-4] + `gltf-skeleton` | |
 | **Morph targets** (POSITION [/ NORMAL / TANGENT]) + weight tracks | |
 | **All meshes + all primitives** | |
 | **Full node hierarchy + TRS** → prefab | |
@@ -62,7 +62,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-gltf-joints1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -86,6 +86,7 @@ node .\spike\e2e-gltf-sparse.cjs
 node .\spike\e2e-gltf-meshopt.cjs
 node .\spike\e2e-gltf-draco.cjs
 node .\spike\e2e-gltf-multibuffer.cjs
+node .\spike\e2e-gltf-joints1.cjs
 node .\spike\e2e-polyhaven.cjs
 node .\spike\e2e-fbx.cjs
 ```
@@ -167,3 +168,8 @@ Multi-buffer (`fixtures/gltf-multibuffer/multibuffer.gltf`):
 
 - Positions in `pos.bin` (buffer 0); normals / UVs / indices in `rest.bin` (buffer 1)
 - Flattened to a single buffer 0 before accessor / embedded-image reads
+
+Joints1 (`fixtures/gltf-joints1/joints1.gltf`):
+
+- `JOINTS_0`/`WEIGHTS_0` + `JOINTS_1`/`WEIGHTS_1` (8 influences)
+- Creator-compatible prune: sort by weight, keep top 4 → `a_joints` / `a_weights` (no `a_joints1`)

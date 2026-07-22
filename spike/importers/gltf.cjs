@@ -5,12 +5,12 @@
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
- * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph] [/ sparse] [/ meshopt]),
+ * [/ TANGENT] [/ JOINTS+WEIGHTS top-4] [/ morph] [/ sparse] [/ meshopt] [/ Draco]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
  * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit +
  * emissive_strength + ior/specular + anisotropy),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
- * No lights / cameras (Creator also skips). Transmission / Draco still out of scope.
+ * No lights / cameras (Creator also skips). Transmission still out of scope.
  */
 
 const crypto = require('crypto');
@@ -644,6 +644,41 @@ function readIndices(doc, accessorIndex) {
   return out;
 }
 
+/** Collect JOINTS_n / WEIGHTS_n sets (n = 0,1,… contiguous). */
+function collectJointWeightSets(doc, attrs) {
+  const sets = [];
+  for (let n = 0; ; n++) {
+    const jKey = `JOINTS_${n}`;
+    const wKey = `WEIGHTS_${n}`;
+    if (attrs[jKey] == null || attrs[wKey] == null) break;
+    sets.push({
+      joints: readAccessor(doc, attrs[jKey]).values,
+      weights: readAccessor(doc, attrs[wKey]).values,
+    });
+  }
+  return sets;
+}
+
+/**
+ * Creator behaviour: merge all JOINTS_n / WEIGHTS_n and keep the 4 heaviest
+ * influences as a_joints / a_weights (no a_joints1).
+ */
+function top4Influences(sets, vertIndex) {
+  const pairs = [];
+  for (const s of sets) {
+    for (let c = 0; c < 4; c++) {
+      pairs.push({
+        j: s.joints[vertIndex * 4 + c] | 0,
+        w: s.weights[vertIndex * 4 + c] || 0,
+      });
+    }
+  }
+  pairs.sort((a, b) => b.w - a.w || a.j - b.j);
+  const top = pairs.slice(0, 4);
+  while (top.length < 4) top.push({ j: 0, w: 0 });
+  return top;
+}
+
 function buildPrimitiveBuffers(doc, primitive) {
   const attrs = primitive.attributes || {};
   if (attrs.POSITION == null) throw new Error('primitive missing POSITION');
@@ -675,16 +710,15 @@ function buildPrimitiveBuffers(doc, primitive) {
     ? readAccessor(doc, attrs.TEXCOORD_1)
     : null;
 
-  const skinned = attrs.JOINTS_0 != null && attrs.WEIGHTS_0 != null;
-  let jointsValues = null;
-  let weightsValues = null;
+  const jointSets = collectJointWeightSets(doc, attrs);
+  const skinned = jointSets.length > 0;
   let maxJointIndex = -1;
   if (skinned) {
-    jointsValues = readAccessor(doc, attrs.JOINTS_0).values;
-    weightsValues = readAccessor(doc, attrs.WEIGHTS_0).values;
-    for (let i = 0; i < jointsValues.length; i++) {
-      const j = jointsValues[i] | 0;
-      if (j > maxJointIndex) maxJointIndex = j;
+    for (const s of jointSets) {
+      for (let i = 0; i < s.joints.length; i++) {
+        const j = s.joints[i] | 0;
+        if (j > maxJointIndex) maxJointIndex = j;
+      }
     }
   }
 
@@ -728,14 +762,15 @@ function buildPrimitiveBuffers(doc, primitive) {
       vb.writeFloatLE(uv1.values[i * 2 + 1] || 0, o + uv1Off + 4);
     }
     if (skinned) {
-      vb.writeUInt16LE(jointsValues[i * 4] | 0, o + jointsOff);
-      vb.writeUInt16LE(jointsValues[i * 4 + 1] | 0, o + jointsOff + 2);
-      vb.writeUInt16LE(jointsValues[i * 4 + 2] | 0, o + jointsOff + 4);
-      vb.writeUInt16LE(jointsValues[i * 4 + 3] | 0, o + jointsOff + 6);
-      vb.writeFloatLE(weightsValues[i * 4] || 0, o + jointsOff + 8);
-      vb.writeFloatLE(weightsValues[i * 4 + 1] || 0, o + jointsOff + 12);
-      vb.writeFloatLE(weightsValues[i * 4 + 2] || 0, o + jointsOff + 16);
-      vb.writeFloatLE(weightsValues[i * 4 + 3] || 0, o + jointsOff + 20);
+      const top = top4Influences(jointSets, i);
+      vb.writeUInt16LE(top[0].j, o + jointsOff);
+      vb.writeUInt16LE(top[1].j, o + jointsOff + 2);
+      vb.writeUInt16LE(top[2].j, o + jointsOff + 4);
+      vb.writeUInt16LE(top[3].j, o + jointsOff + 6);
+      vb.writeFloatLE(top[0].w, o + jointsOff + 8);
+      vb.writeFloatLE(top[1].w, o + jointsOff + 12);
+      vb.writeFloatLE(top[2].w, o + jointsOff + 16);
+      vb.writeFloatLE(top[3].w, o + jointsOff + 20);
     }
     if (px < minX) minX = px; if (py < minY) minY = py; if (pz < minZ) minZ = pz;
     if (px > maxX) maxX = px; if (py > maxY) maxY = py; if (pz > maxZ) maxZ = pz;
