@@ -1,5 +1,9 @@
 # Headless Cocos Creator 3.8 Preview
 
+> **Archive / milestone note (2026-07).** Prefer the current docs:
+> [README](../README.md) · [architecture](architecture.md) · [importers](importers.md) · [docker](docker.md).
+> This file remains as an early write-up; importer coverage and Docker wipe-tests landed after it.
+
 > **Status:** proven working end-to-end. Cocos Creator IDE process is not running.
 > AI edits `.ts` on disk → browser reloads with new code in ~2s.
 
