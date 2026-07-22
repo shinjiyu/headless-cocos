@@ -4,19 +4,10 @@
 /**
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
- * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT]), material + albedo,
- * full node hierarchy prefab, and node-TRS animations as ExoticAnimation CCON
- * (`gltf-animation`). No skins / morphs / lights.
- *
- * Library products (mirrors Creator's `gltf` importer shape):
- *   <uuid>@xxxxx.json/.bin   cc.Mesh
- *   <uuid>@xxxxx.json        cc.Texture2D  (mipmaps → ImageAsset uuid)
- *   <uuid>@xxxxx.json        cc.Material   (builtin standard effect)
- *   <uuid>@xxxxx.bin         cc.AnimationClip (CCON v2 ExoticAnimation)
- *   <uuid>@xxxxx.json        prefab array  (gltf-scene + cc.Animation)
- *
- * Sub-meta ids are preserved when present in .meta; otherwise derived as
- * md5(`${kind}:${index}:${name}`).slice(0,5) so reimports stay stable.
+ * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT] [/ JOINTS+WEIGHTS]),
+ * material + albedo, full node hierarchy prefab, ExoticAnimation clips, and
+ * skins (`gltf-skeleton` + SkinnedMeshRenderer / SkeletalAnimation).
+ * No morphs / lights.
  */
 
 const crypto = require('crypto');
@@ -30,7 +21,7 @@ const GLTF_EXTS = new Set(['.gltf', '.glb']);
 const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
 
 // Cocos GFX Format enum values used in Mesh._struct
-const FMT = { RG32F: 21, RGB32F: 32, RGBA32F: 44 };
+const FMT = { RG32F: 21, RGB32F: 32, RGBA16UI: 42, RGBA32F: 44 };
 const PRIM_TRIANGLES = 7;
 
 const COMPONENT = {
@@ -184,7 +175,20 @@ function buildPrimitiveBuffers(doc, primitive) {
     }
   }
 
-  const stride = 48;
+  const skinned = attrs.JOINTS_0 != null && attrs.WEIGHTS_0 != null;
+  let jointsValues = null;
+  let weightsValues = null;
+  let maxJointIndex = -1;
+  if (skinned) {
+    jointsValues = readAccessor(doc, attrs.JOINTS_0).values;
+    weightsValues = readAccessor(doc, attrs.WEIGHTS_0).values;
+    for (let i = 0; i < jointsValues.length; i++) {
+      const j = jointsValues[i] | 0;
+      if (j > maxJointIndex) maxJointIndex = j;
+    }
+  }
+
+  const stride = skinned ? 72 : 48;
   const vb = Buffer.alloc(nVert * stride);
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -203,6 +207,16 @@ function buildPrimitiveBuffers(doc, primitive) {
     vb.writeFloatLE(tanValues[i * 4 + 1] || 0, o + 36);
     vb.writeFloatLE(tanValues[i * 4 + 2] || 0, o + 40);
     vb.writeFloatLE(tanValues[i * 4 + 3] || 1, o + 44);
+    if (skinned) {
+      vb.writeUInt16LE(jointsValues[i * 4] | 0, o + 48);
+      vb.writeUInt16LE(jointsValues[i * 4 + 1] | 0, o + 50);
+      vb.writeUInt16LE(jointsValues[i * 4 + 2] | 0, o + 52);
+      vb.writeUInt16LE(jointsValues[i * 4 + 3] | 0, o + 54);
+      vb.writeFloatLE(weightsValues[i * 4] || 0, o + 56);
+      vb.writeFloatLE(weightsValues[i * 4 + 1] || 0, o + 60);
+      vb.writeFloatLE(weightsValues[i * 4 + 2] || 0, o + 64);
+      vb.writeFloatLE(weightsValues[i * 4 + 3] || 0, o + 68);
+    }
     if (px < minX) minX = px; if (py < minY) minY = py; if (pz < minZ) minZ = pz;
     if (px > maxX) maxX = px; if (py > maxY) maxY = py; if (pz > maxZ) maxZ = pz;
   }
@@ -230,11 +244,14 @@ function buildPrimitiveBuffers(doc, primitive) {
     materialIndex: primitive.material != null ? primitive.material : 0,
     min: [minX, minY, minZ],
     max: [maxX, maxY, maxZ],
+    skinned,
+    maxJointIndex,
+    stride,
   };
 }
 
-/** Build one cc.Mesh from a glTF mesh (all primitives). */
-function buildMeshFromGltfMesh(doc, gltfMesh) {
+/** Build one cc.Mesh from a glTF mesh (all primitives). Optional skin → jointMaps. */
+function buildMeshFromGltfMesh(doc, gltfMesh, skin) {
   const prims = gltfMesh.primitives || [];
   if (!prims.length) throw new Error('mesh has no primitives');
 
@@ -246,6 +263,7 @@ function buildMeshFromGltfMesh(doc, gltfMesh) {
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   let triangleCount = 0;
+  const anySkinned = built.some((b) => b.skinned);
 
   for (let i = 0; i < built.length; i++) {
     const b = built[i];
@@ -256,16 +274,23 @@ function buildMeshFromGltfMesh(doc, gltfMesh) {
     parts.push(b.ib);
     offset += b.ib.length;
 
+    const attributes = [
+      { name: 'a_position', format: FMT.RGB32F, isNormalized: false },
+      { name: 'a_normal', format: FMT.RGB32F, isNormalized: false },
+      { name: 'a_texCoord', format: FMT.RG32F, isNormalized: false },
+      { name: 'a_tangent', format: FMT.RGBA32F, isNormalized: false },
+    ];
+    if (b.skinned) {
+      attributes.push(
+        { name: 'a_joints', format: FMT.RGBA16UI, isNormalized: false },
+        { name: 'a_weights', format: FMT.RGBA32F, isNormalized: false },
+      );
+    }
     vertexBundles.push({
-      view: { offset: vbOffset, length: b.vb.length, count: b.nVert, stride: 48 },
-      attributes: [
-        { name: 'a_position', format: FMT.RGB32F, isNormalized: false },
-        { name: 'a_normal', format: FMT.RGB32F, isNormalized: false },
-        { name: 'a_texCoord', format: FMT.RG32F, isNormalized: false },
-        { name: 'a_tangent', format: FMT.RGBA32F, isNormalized: false },
-      ],
+      view: { offset: vbOffset, length: b.vb.length, count: b.nVert, stride: b.stride },
+      attributes,
     });
-    primitives.push({
+    const prim = {
       primitiveMode: PRIM_TRIANGLES,
       vertexBundelIndices: [i],
       indexView: {
@@ -274,7 +299,9 @@ function buildMeshFromGltfMesh(doc, gltfMesh) {
         count: b.indexCount,
         stride: b.indexStride,
       },
-    });
+    };
+    if (b.skinned) prim.jointMapIndex = 0;
+    primitives.push(prim);
     triangleCount += Math.floor(b.indexCount / 3);
     if (b.min[0] < minX) minX = b.min[0];
     if (b.min[1] < minY) minY = b.min[1];
@@ -285,24 +312,31 @@ function buildMeshFromGltfMesh(doc, gltfMesh) {
   }
 
   const bin = Buffer.concat(parts);
+  const meshStruct = {
+    primitives,
+    vertexBundles,
+    minPosition: { __type__: 'cc.Vec3', x: minX, y: minY, z: minZ },
+    maxPosition: { __type__: 'cc.Vec3', x: maxX, y: maxY, z: maxZ },
+  };
+  if (anySkinned) {
+    let nJoints = skin && Array.isArray(skin.joints) ? skin.joints.length : 0;
+    if (!nJoints) {
+      nJoints = Math.max(-1, ...built.map((b) => b.maxJointIndex)) + 1;
+    }
+    meshStruct.jointMaps = [Array.from({ length: nJoints }, (_, i) => i)];
+  }
   const meshJson = {
     __type__: 'cc.Mesh',
     _name: '',
     _objFlags: 0,
     __editorExtras__: {},
     _native: '.bin',
-    _struct: {
-      primitives,
-      vertexBundles,
-      minPosition: { __type__: 'cc.Vec3', x: minX, y: minY, z: minZ },
-      maxPosition: { __type__: 'cc.Vec3', x: maxX, y: maxY, z: maxZ },
-    },
+    _struct: meshStruct,
     _hash: djb2(bin),
     _allowDataAccess: true,
   };
-  // Material slots follow primitive order (Creator assigns one material per prim).
   const materialIndices = built.map((b) => b.materialIndex);
-  return { bin, meshJson, materialIndices, triangleCount };
+  return { bin, meshJson, materialIndices, triangleCount, skinned: anySkinned };
 }
 
 function quatFromGltf(node) {
@@ -385,6 +419,78 @@ function makeMeshRenderer(nodeId, meshUuid, materialUuids, bakeId, compPrefabId)
     _enabledGlobalStandardSkinObject: false,
     _enableMorph: true,
     _id: '',
+  };
+}
+
+function makeSkinnedMeshRenderer(nodeId, meshUuid, skeletonUuid, skinningRootId, materialUuids, bakeId, compPrefabId) {
+  return {
+    __type__: 'cc.SkinnedMeshRenderer',
+    _name: '',
+    _objFlags: 0,
+    __editorExtras__: {},
+    node: { __id__: nodeId },
+    _enabled: true,
+    __prefab: { __id__: compPrefabId },
+    _materials: (materialUuids || []).filter(Boolean).map((u) => ({
+      __uuid__: u,
+      __expectedType__: 'cc.Material',
+    })),
+    _visFlags: 0,
+    bakeSettings: { __id__: bakeId },
+    _mesh: { __uuid__: meshUuid, __expectedType__: 'cc.Mesh' },
+    _shadowCastingMode: 0,
+    _shadowReceivingMode: 1,
+    _shadowBias: 0,
+    _shadowNormalBias: 0,
+    _reflectionProbeId: -1,
+    _reflectionProbeBlendId: -1,
+    _reflectionProbeBlendWeight: 0,
+    _enabledGlobalStandardSkinObject: false,
+    _enableMorph: true,
+    _skeleton: { __uuid__: skeletonUuid, __expectedType__: 'cc.Skeleton' },
+    _skinningRoot: { __id__: skinningRootId },
+    _id: '',
+  };
+}
+
+/** Build cc.Skeleton JSON from a glTF skin (joints paths + inverseBindMatrices). */
+function buildSkeletonJson(doc, skinIndex) {
+  const skin = (doc.json.skins || [])[skinIndex];
+  if (!skin) throw new Error(`missing skin ${skinIndex}`);
+  const joints = (skin.joints || []).map((ji) => gltfNodePath(doc, ji));
+  const bindposes = [];
+  if (skin.inverseBindMatrices != null) {
+    const ibm = readAccessor(doc, skin.inverseBindMatrices);
+    for (let i = 0; i < ibm.count; i++) {
+      const o = i * 16;
+      const m = ibm.values;
+      bindposes.push({
+        __type__: 'cc.Mat4',
+        m00: m[o], m01: m[o + 1], m02: m[o + 2], m03: m[o + 3],
+        m04: m[o + 4], m05: m[o + 5], m06: m[o + 6], m07: m[o + 7],
+        m08: m[o + 8], m09: m[o + 9], m10: m[o + 10], m11: m[o + 11],
+        m12: m[o + 12], m13: m[o + 13], m14: m[o + 14], m15: m[o + 15],
+      });
+    }
+  }
+  while (bindposes.length < joints.length) {
+    bindposes.push({
+      __type__: 'cc.Mat4',
+      m00: 1, m01: 0, m02: 0, m03: 0,
+      m04: 0, m05: 1, m06: 0, m07: 0,
+      m08: 0, m09: 0, m10: 1, m11: 0,
+      m12: 0, m13: 0, m14: 0, m15: 1,
+    });
+  }
+  return {
+    __type__: 'cc.Skeleton',
+    _name: skin.name || `Skin-${skinIndex}`,
+    _objFlags: 0,
+    __editorExtras__: {},
+    _native: '',
+    _joints: joints,
+    _bindposes: bindposes,
+    _hash: 0,
   };
 }
 
@@ -592,16 +698,25 @@ function buildAnimationClipCcon(doc, animIndex, sample) {
 
 /**
  * Build a Creator-style gltf-scene prefab:
- *   Prefab → outer wrapper node → glTF scene root(s) with full TRS hierarchy
- *   and MeshRenderer on every node that references a mesh.
- *   Optional clipUuids → cc.Animation on the wrapper.
+ *   Prefab → outer wrapper → glTF hierarchy with MeshRenderer or SkinnedMeshRenderer.
+ *   Clips → cc.Animation (static) or cc.SkeletalAnimation (when skins present).
  */
-function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed, fallbackName, clipUuids) {
+function buildHierarchyPrefab(
+  doc,
+  meshIds,
+  materialIds,
+  meshMaterialSlots,
+  seed,
+  fallbackName,
+  clipUuids,
+  skeletonIds,
+) {
   const nodes = doc.json.nodes || [];
   const scenes = doc.json.scenes || [];
   const scene = scenes[doc.json.scene || 0] || scenes[0] || { nodes: nodes.length ? [0] : [], name: fallbackName };
   const sceneName = scene.name || fallbackName || 'Root';
   const rootIndices = scene.nodes && scene.nodes.length ? scene.nodes : (nodes.length ? [0] : []);
+  const hasSkeletons = Array.isArray(skeletonIds) && skeletonIds.some(Boolean);
 
   const out = [];
   out.push({
@@ -661,7 +776,12 @@ function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed
       const bakeId = mrId + 1;
       const compInfoId = mrId + 2;
       comps.push({ __id__: mrId });
-      out.push(makeMeshRenderer(objId, meshUuid, mats, bakeId, compInfoId));
+      const skelUuid = n.skin != null && skeletonIds ? skeletonIds[n.skin] : null;
+      if (skelUuid) {
+        out.push(makeSkinnedMeshRenderer(objId, meshUuid, skelUuid, wrapperId, mats, bakeId, compInfoId));
+      } else {
+        out.push(makeMeshRenderer(objId, meshUuid, mats, bakeId, compInfoId));
+      }
       out.push(makeBakeSettings());
       out.push({ __type__: 'cc.CompPrefabInfo', fileId: fileIdFrom(`${seed}:mr:${gltfIndex}`) });
     }
@@ -704,29 +824,53 @@ function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed
     if (slot) slot.__id__ = childId;
   }
 
-  if (clipUuids && clipUuids.length) {
+  if ((clipUuids && clipUuids.length) || hasSkeletons) {
     const animId = out.length;
     const compInfoId = animId + 1;
     out[wrapperId]._components.push({ __id__: animId });
-    const defaultUuid = clipUuids[0];
-    out.push({
-      __type__: 'cc.Animation',
-      _name: '',
-      _objFlags: 0,
-      __editorExtras__: {},
-      node: { __id__: wrapperId },
-      _enabled: true,
-      __prefab: { __id__: compInfoId },
-      playOnLoad: false,
-      _clips: clipUuids.map((u) => ({
-        __uuid__: u,
-        __expectedType__: 'cc.AnimationClip',
-      })),
-      _defaultClip: defaultUuid
-        ? { __uuid__: defaultUuid, __expectedType__: 'cc.AnimationClip' }
-        : null,
-      _id: '',
-    });
+    const clips = clipUuids || [];
+    const defaultUuid = clips[0] || null;
+    if (hasSkeletons) {
+      out.push({
+        __type__: 'cc.SkeletalAnimation',
+        _name: '',
+        _objFlags: 0,
+        __editorExtras__: {},
+        node: { __id__: wrapperId },
+        _enabled: true,
+        __prefab: { __id__: compInfoId },
+        playOnLoad: false,
+        _clips: clips.map((u) => ({
+          __uuid__: u,
+          __expectedType__: 'cc.AnimationClip',
+        })),
+        _defaultClip: defaultUuid
+          ? { __uuid__: defaultUuid, __expectedType__: 'cc.AnimationClip' }
+          : null,
+        _useBakedAnimation: true,
+        _sockets: [],
+        _id: '',
+      });
+    } else {
+      out.push({
+        __type__: 'cc.Animation',
+        _name: '',
+        _objFlags: 0,
+        __editorExtras__: {},
+        node: { __id__: wrapperId },
+        _enabled: true,
+        __prefab: { __id__: compInfoId },
+        playOnLoad: false,
+        _clips: clips.map((u) => ({
+          __uuid__: u,
+          __expectedType__: 'cc.AnimationClip',
+        })),
+        _defaultClip: defaultUuid
+          ? { __uuid__: defaultUuid, __expectedType__: 'cc.AnimationClip' }
+          : null,
+        _id: '',
+      });
+    }
     out.push({ __type__: 'cc.CompPrefabInfo', fileId: fileIdFrom(`${seed}:anim`) });
   }
 
@@ -982,6 +1126,40 @@ function importGltf(assetPath, libraryRoot) {
     materialIds.push(subUuid);
   }
 
+  // meshIndex → skinIndex (first node that binds both)
+  const meshToSkin = new Map();
+  for (const n of doc.json.nodes || []) {
+    if (n.mesh != null && n.skin != null && !meshToSkin.has(n.mesh)) {
+      meshToSkin.set(n.mesh, n.skin);
+    }
+  }
+
+  // --- skeletons ---
+  const skeletonIds = [];
+  const skins = doc.json.skins || [];
+  for (let i = 0; i < skins.length; i++) {
+    const skelJson = buildSkeletonJson(doc, i);
+    const name = `${skins[i].name || `UnnamedSkeleton-${i}`}.skeleton`;
+    let id = findExistingSubId(meta, 'gltf-skeleton', i, name) || shortId('skel', i, name);
+    const subUuid = `${uuid}@${id}`;
+    meta.subMetas[id] = {
+      importer: 'gltf-skeleton',
+      uuid: subUuid,
+      displayName: '',
+      id,
+      name,
+      userData: { gltfIndex: i, jointsLength: skelJson._joints.length },
+      ver: '1.0.14',
+      imported: true,
+      files: ['.json'],
+      subMetas: {},
+    };
+    if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), skelJson)) {
+      changed.push(`${subUuid}.json`);
+    }
+    skeletonIds.push(subUuid);
+  }
+
   // --- meshes (all primitives per mesh) ---
   const meshMaterialSlots = []; // meshIndex → [materialIndex per prim]
   for (let i = 0; i < meshes.length; i++) {
@@ -991,7 +1169,9 @@ function importGltf(assetPath, libraryRoot) {
       meshMaterialSlots.push([]);
       continue;
     }
-    const built = buildMeshFromGltfMesh(doc, mesh);
+    const skinIndex = meshToSkin.has(i) ? meshToSkin.get(i) : null;
+    const skin = skinIndex != null ? skins[skinIndex] : null;
+    const built = buildMeshFromGltfMesh(doc, mesh, skin);
     const name = `${mesh.name || baseName}.mesh`;
     let id = findExistingSubId(meta, 'gltf-mesh', i, name) || shortId('mesh', i, name);
     const subUuid = `${uuid}@${id}`;
@@ -1085,6 +1265,7 @@ function importGltf(assetPath, libraryRoot) {
       subUuid,
       baseName,
       animationIds,
+      skeletonIds,
     );
     if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), prefab)) changed.push(`${subUuid}.json`);
     sceneIds.push(subUuid);
@@ -1092,7 +1273,7 @@ function importGltf(assetPath, libraryRoot) {
 
   meta.userData.assetFinder = {
     meshes: meshIds.filter(Boolean),
-    skeletons: [],
+    skeletons: skeletonIds.filter(Boolean),
     textures: textureIds,
     materials: materialIds,
     scenes: sceneIds,
@@ -1118,6 +1299,7 @@ function importGltf(assetPath, libraryRoot) {
     textures: textureIds,
     scenes: sceneIds,
     animations: animationIds,
+    skeletons: skeletonIds,
     changed,
   };
 }

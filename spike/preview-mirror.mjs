@@ -1024,6 +1024,7 @@ function importGltfLogged(absPath, label) {
         '[gltf-import]',
         label,
         `meshes=${r.meshes.filter(Boolean).length}`,
+        `skels=${(r.skeletons || []).length}`,
         `anims=${(r.animations || []).length}`,
         `mats=${r.materials.length}`,
         `→ ${r.uuid}`,

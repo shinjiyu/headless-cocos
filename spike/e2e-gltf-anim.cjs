@@ -16,12 +16,18 @@ const { decodeCCONBinary } = require('./importers/ccon.cjs');
 const FIXTURE_SRC =
   process.env.GLTF_ANIM_FIXTURE ||
   'D:/workspace/selfGame/assets/AssetPool/kenney/kenney-local/asset_584a5cb0050a70f7';
-const PROJECT = process.env.PROJECT || 'd:/tempWorkspace/baseAIAutoCocos';
-const DIR = path.join(PROJECT, 'assets', 'gltf-anim-e2e');
-const LIBRARY = path.join(PROJECT, 'library');
-const URL = process.env.PROBE_URL || 'http://127.0.0.1:7460/?autoReload=false';
 const SKIP_BROWSER = process.argv.includes('--disk-only');
 const CLEANUP = process.argv.includes('--cleanup');
+const URL = process.env.PROBE_URL || 'http://127.0.0.1:7460/?autoReload=false';
+
+// Disk-only uses an isolated temp tree so parallel e2e cannot clobber project library.
+const PROJECT = process.env.PROJECT || 'd:/tempWorkspace/baseAIAutoCocos';
+const DIR = SKIP_BROWSER
+  ? path.join(os.tmpdir(), 'gltf-anim-e2e')
+  : path.join(PROJECT, 'assets', 'gltf-anim-e2e');
+const LIBRARY = SKIP_BROWSER
+  ? path.join(DIR, 'library')
+  : path.join(PROJECT, 'library');
 
 function cleanup() {
   fs.rmSync(DIR, { recursive: true, force: true });
@@ -76,7 +82,9 @@ function copyFixture() {
   const prefab = JSON.parse(
     fs.readFileSync(path.join(LIBRARY, r.uuid.slice(0, 2), `${r.scenes[0]}.json`), 'utf8'),
   );
-  const anim = prefab.find((o) => o && o.__type__ === 'cc.Animation');
+  const anim = prefab.find(
+    (o) => o && (o.__type__ === 'cc.Animation' || o.__type__ === 'cc.SkeletalAnimation'),
+  );
   if (!anim || anim._clips.length !== 27) {
     throw new Error(`prefab Animation clips ${anim && anim._clips.length}`);
   }
