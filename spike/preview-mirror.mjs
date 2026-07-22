@@ -26,7 +26,6 @@ import plistImporter from './importers/plist.cjs';
 import textImporter from './importers/text.cjs';
 import gltfImporter from './importers/gltf.cjs';
 import fbxImporter from './importers/fbx.cjs';
-import fbxImporter from './importers/fbx.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);

@@ -34,20 +34,21 @@ Standard effect: `c8f66d17-351a-48da-a12c-0212d28575c4`.
 
 `{CREATOR}/resources/app.asar.unpacked/node_modules/@cocos/fbx2gltf/bin/Windows_NT/FBX2glTF.exe`
 
-Override with `FBX2GLTF`. Intermediate file: `._fbx_<name>.glb` next to the `.fbx`.
+Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2gltf-<hash>/` (mtime-cached).
 
 ## Code
 
 - `spike/importers/gltf.cjs` — hierarchy + multi-prim
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs` (sand), `e2e-gltf-hierarchy.cjs` (character-a)
+- E2E: `e2e-gltf.cjs` (sand), `e2e-gltf-hierarchy.cjs` (character-a), `e2e-fbx.cjs`
 
 ## Verify
 
 ```powershell
 node .\spike\e2e-gltf.cjs
 node .\spike\e2e-gltf-hierarchy.cjs
+node .\spike\e2e-fbx.cjs
 ```
 
 Ground truth (`character-a.glb` from selfGame / Kenney):
