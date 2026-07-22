@@ -7,7 +7,8 @@
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
  * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
- * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit),
+ * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit +
+ * emissive_strength),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
  * No lights / cameras (Creator also skips). Transmission still out of scope.
  */
@@ -1306,6 +1307,7 @@ function materialJsonUnlit(mat, textureIds, options = {}) {
  *   texCoord=1 → HAS_SECOND_UV + v_uv1 macros
  *   KHR_texture_transform on baseColor → tilingOffset
  *   KHR_materials_clearcoat → car-paint effect + coatRoughness / coatIntensity
+ *   KHR_materials_emissive_strength → emissiveScale
  *
  * @param {object} mat glTF material
  * @param {string[]} textureIds texture sub-uuids by glTF texture index
@@ -1390,6 +1392,17 @@ function materialJson(mat, textureIds, options = {}) {
       [0, 0, 0, 1],
     );
   }
+  const emissiveStrengthExt =
+    mat.extensions && mat.extensions.KHR_materials_emissive_strength;
+  if (emissiveStrengthExt && emissiveStrengthExt.emissiveStrength != null) {
+    const s = emissiveStrengthExt.emissiveStrength;
+    props.emissiveScale = {
+      __type__: 'cc.Vec3',
+      x: s,
+      y: s,
+      z: s,
+    };
+  }
 
   if (needsSecondUv) {
     defines[0].HAS_SECOND_UV = true;
@@ -1405,6 +1418,7 @@ function materialJson(mat, textureIds, options = {}) {
     delete defines[0].EMISSIVE_UV;
     delete props.emissiveMap;
     delete props.emissive;
+    delete props.emissiveScale;
 
     props.coatRoughness =
       clearcoat.clearcoatRoughnessFactor != null
