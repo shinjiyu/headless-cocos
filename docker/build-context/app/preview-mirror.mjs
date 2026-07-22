@@ -81,7 +81,7 @@ const { BMFONT_EXTS, importBMFont } = bmfontImporter;
 const { importSpine, importSpineBinary, isSpineJson } = spineImporter;
 const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
-const { GLTF_EXTS, importGltf, prepareGltfDecoders } = gltfImporter;
+const { GLTF_EXTS, importGltf, prepareGltfDecoders, importOptionsFromQuery } = gltfImporter;
 const { FBX_EXTS, importFbx } = fbxImporter;
 const { fetchModel, listModels } = polyhavenImporter;
 
@@ -1131,17 +1131,33 @@ function importPlistLogged(absPath, label) {
     return null;
   }
 }
-function importGltfLogged(absPath, label) {
+/** Resolve ?file= under PROJECT; reject path escape. */
+function resolveProjectAssetPath(fileParam) {
+  const raw = String(fileParam || '').replace(/\\/g, '/');
+  if (!raw || raw.includes('\0')) throw new Error('invalid file');
+  const abs = path.resolve(PROJECT, raw);
+  const rel = path.relative(path.resolve(PROJECT), abs);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('file must be under PROJECT');
+  }
+  return abs;
+}
+
+function importGltfLogged(absPath, label, options) {
   try {
-    const r = importGltf(absPath, LIBRARY);
+    const r = importGltf(absPath, LIBRARY, options || {});
     if (r && r.changed.length) {
+      const variantNote =
+        r.variants && r.variants.active != null
+          ? ` variant=${r.variants.names[r.variants.active]}`
+          : '';
       console.log(
         '[gltf-import]',
         label,
         `meshes=${r.meshes.filter(Boolean).length}`,
         `skels=${(r.skeletons || []).length}`,
         `anims=${(r.animations || []).length}`,
-        `mats=${r.materials.length}`,
+        `mats=${r.materials.length}${variantNote}`,
         `→ ${r.uuid}`,
       );
     }
@@ -1488,8 +1504,9 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Poly Haven: GET/POST /__polyhaven?id=wooden_table_02&res=1k&spawn=1
+  // Poly Haven: GET/POST /__polyhaven?id=wooden_table_02&res=1k&spawn=1&variant=
   //             GET /__polyhaven/list?maxPoly=1000&limit=20
+  // Local glTF: GET/POST /__gltf?file=assets/foo.gltf&variant=Yellow&spawn=1
   {
     const u = new URL(urlPath, 'http://127.0.0.1');
     if (u.pathname === '/__polyhaven/list') {
@@ -1508,13 +1525,81 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+    if (u.pathname === '/__gltf') {
+      if (req.method !== 'GET' && req.method !== 'POST') {
+        send(res, 405, JSON.stringify({ ok: false, error: 'GET or POST' }), 'application/json; charset=utf-8', 'gltf');
+        return;
+      }
+      const fileParam = u.searchParams.get('file') || u.searchParams.get('path');
+      if (!fileParam) {
+        send(
+          res,
+          400,
+          JSON.stringify({
+            ok: false,
+            error: 'missing ?file=',
+            usage: '/__gltf?file=assets/models/foo.gltf&variant=Yellow&spawn=1',
+          }),
+          'application/json; charset=utf-8',
+          'gltf',
+        );
+        return;
+      }
+      try {
+        const abs = resolveProjectAssetPath(fileParam);
+        const ext = path.extname(abs).toLowerCase();
+        if (!GLTF_EXTS.has(ext)) {
+          throw new Error(`not a glTF/GLB: ${ext}`);
+        }
+        if (!fs.existsSync(abs)) throw new Error(`file not found: ${fileParam}`);
+        const importOpts = importOptionsFromQuery(u.searchParams);
+        const wantSpawn = u.searchParams.get('spawn') === '1' || u.searchParams.get('spawn') === 'true';
+        const r = importGltf(abs, LIBRARY, importOpts);
+        if (!r) throw new Error('importGltf returned null');
+        const prefabUuid = r.scenes && r.scenes[0];
+        let spawn = null;
+        if (wantSpawn && prefabUuid) {
+          spawn = setPendingSpawn({
+            uuid: prefabUuid,
+            name: u.searchParams.get('name') || path.basename(abs, ext),
+            clear: u.searchParams.get('clear') !== '0',
+          });
+        }
+        if (typeof broadcastReload === 'function') broadcastReload(`gltf:${path.basename(abs)}`);
+        send(
+          res,
+          200,
+          JSON.stringify({
+            ok: true,
+            file: path.relative(PROJECT, abs).replace(/\\/g, '/'),
+            uuid: r.uuid,
+            meshes: r.meshes.filter(Boolean),
+            materials: r.materials,
+            textures: r.textures,
+            scenes: r.scenes,
+            variants: r.variants,
+            spawn,
+          }),
+          'application/json; charset=utf-8',
+          'gltf',
+        );
+      } catch (err) {
+        console.warn('[gltf] failed', fileParam, err.message);
+        send(res, 400, JSON.stringify({ ok: false, error: String(err.message || err) }), 'application/json; charset=utf-8', 'gltf');
+      }
+      return;
+    }
     if (u.pathname === '/__polyhaven') {
       const id = u.searchParams.get('id');
       if (!id) {
         send(
           res,
           400,
-          JSON.stringify({ ok: false, error: 'missing ?id=', usage: '/__polyhaven?id=wooden_table_02&res=1k&spawn=1' }),
+          JSON.stringify({
+            ok: false,
+            error: 'missing ?id=',
+            usage: '/__polyhaven?id=wooden_table_02&res=1k&spawn=1&variant=',
+          }),
           'application/json; charset=utf-8',
           'polyhaven',
         );
@@ -1527,16 +1612,20 @@ const server = http.createServer(async (req, res) => {
       try {
         const resolution = u.searchParams.get('res') || '1k';
         const wantSpawn = u.searchParams.get('spawn') === '1' || u.searchParams.get('spawn') === 'true';
+        const importOpts = importOptionsFromQuery(u.searchParams);
         const destDir = path.join(ASSETS, 'polyhaven', id);
         console.log('[polyhaven] fetch', id, `@${resolution}`, '→', destDir);
         const pkg = await fetchModel(id, destDir, { resolution });
-        const r = importGltf(pkg.entryGltf, LIBRARY);
+        const r = importGltf(pkg.entryGltf, LIBRARY, importOpts);
         if (!r) throw new Error('importGltf returned null');
         console.log(
           '[polyhaven] imported',
           id,
           `meshes=${r.meshes.filter(Boolean).length}`,
           `mats=${r.materials.length}`,
+          r.variants && r.variants.active != null
+            ? `variant=${r.variants.names[r.variants.active]}`
+            : '',
           `→ ${r.uuid}`,
         );
         const prefabUuid = r.scenes && r.scenes[0];
@@ -1559,6 +1648,7 @@ const server = http.createServer(async (req, res) => {
             materials: r.materials,
             textures: r.textures,
             scenes: r.scenes,
+            variants: r.variants,
             spawn,
             source: `https://polyhaven.com/a/${encodeURIComponent(id)}`,
           }),

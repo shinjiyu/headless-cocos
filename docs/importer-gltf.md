@@ -33,7 +33,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | **alphaMode** MASK / BLEND (+ doubleSided) | |
 | Preserve Creator `.meta` sub-ids | |
 | **Poly Haven fetch** → `importGltf` (`docs/polyhaven.md`) | |
-| Mirror **`/__polyhaven?spawn=1`** → instantiate prefab in preview | |
+| Mirror **`/__polyhaven?spawn=1&variant=`** / **`/__gltf?file=&variant=`** | |
 
 ## Library products
 
@@ -150,6 +150,7 @@ Variants (`fixtures/gltf-variants/variants.gltf`):
 - Root `KHR_materials_variants` names → `meta.userData.materialVariants` + `result.variants`
 - Primitive mappings baked into MeshRenderer slots via `importGltf(path, lib, { variant: 'Yellow' | 0 })`
 - Default (no option) keeps `primitive.material`
+- Mirror: `/__gltf?file=assets/foo.gltf&variant=Yellow&spawn=1` and `/__polyhaven?...&variant=`
 - Optional coat textures → `coatDataMap` (Creator channel pack differs from glTF)
 
 Unlit (`fixtures/gltf-unlit/unlit.gltf`):

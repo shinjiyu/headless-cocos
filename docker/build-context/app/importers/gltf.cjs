@@ -2126,6 +2126,25 @@ function resolvePrimitiveMaterialIndex(prim, variantIndex) {
   return fallback;
 }
 
+/**
+ * Build importGltf options from URL query / plain object.
+ * Recognizes `variant` as name or numeric index.
+ */
+function importOptionsFromQuery(query) {
+  const opts = {};
+  if (!query) return opts;
+  const raw =
+    typeof query.get === 'function' ? query.get('variant') : query.variant;
+  if (raw == null || raw === '') return opts;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    opts.variant = raw | 0;
+    return opts;
+  }
+  const s = String(raw);
+  opts.variant = /^\d+$/.test(s) ? Number(s) : s;
+  return opts;
+}
+
 function importGltf(assetPath, libraryRoot, options = {}) {
   const ext = path.extname(assetPath).toLowerCase();
   if (!GLTF_EXTS.has(ext)) return null;
@@ -2471,6 +2490,7 @@ module.exports = {
   prepareGltfDecoders,
   importGltf,
   importGltfAsync,
+  importOptionsFromQuery,
   loadGltf,
   parseGlb,
 };

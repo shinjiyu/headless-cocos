@@ -49,18 +49,22 @@ With `preview-mirror` running (`PACKER=mini`):
 GET  /__polyhaven/list?maxPoly=1000&limit=20
 GET  /__polyhaven?id=wooden_table_02&res=1k
 GET  /__polyhaven?id=wooden_table_02&res=1k&spawn=1
+GET  /__polyhaven?id=wooden_table_02&res=1k&spawn=1&variant=Yellow
 POST /__polyhaven?id=wooden_table_02&res=1k&spawn=1
+GET  /__gltf?file=assets/models/foo.gltf&variant=Yellow&spawn=1
 GET  /__spawn?uuid=<prefabUuid>&name=wooden_table_02
 GET  /__spawn-pending
 ```
 
 `spawn=1` queues the imported scene prefab, triggers HMR reload, then the
 injected boot script (`index.html`) `loadAny` + `instantiate`s it into the
-live scene as a child named after the asset id. `/__spawn` does the same for
+live scene as a child named after the asset id. `variant=` (name or index) bakes
+`KHR_materials_variants` into MeshRenderer slots at import. `/__gltf` re-imports
+a project-local `.gltf`/`.glb`. `/__spawn` does the same for
 any existing prefab uuid (`reload=1` to force a full page reload first).
 
 Fetches into `assets/polyhaven/{id}/`, runs `importGltf`, then broadcasts HMR reload.
-JSON response includes `uuid`, mesh/material sub-ids, optional `spawn`, and the Poly Haven source URL.
+JSON response includes `uuid`, mesh/material sub-ids, optional `spawn` / `variants`, and the Poly Haven source URL.
 
 ## assetsSrcAPI
 

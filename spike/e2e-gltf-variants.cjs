@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { importGltf } = require('./importers/gltf.cjs');
+const { importGltf, importOptionsFromQuery } = require('./importers/gltf.cjs');
 
 const SRC = path.join(__dirname, 'fixtures', 'gltf-variants', 'variants.gltf');
 
@@ -26,6 +26,14 @@ function albedoOf(library, uuid, matUuid) {
 }
 
 (async () => {
+  const q = importOptionsFromQuery(new URLSearchParams('variant=Yellow'));
+  if (q.variant !== 'Yellow') throw new Error(`query name ${JSON.stringify(q)}`);
+  const qn = importOptionsFromQuery(new URLSearchParams('variant=1'));
+  if (qn.variant !== 1) throw new Error(`query index ${JSON.stringify(qn)}`);
+  if (Object.keys(importOptionsFromQuery(new URLSearchParams(''))).length) {
+    throw new Error('empty query should yield {}');
+  }
+
   const library = path.join(os.tmpdir(), 'e2e-gltf-variants');
   fs.rmSync(library, { recursive: true, force: true });
   fs.mkdirSync(library, { recursive: true });
