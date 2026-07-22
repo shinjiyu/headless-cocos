@@ -7,10 +7,10 @@
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
  * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
- * texCoord UV sets + KHR_texture_transform),
+ * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
- * No lights / cameras (Creator also skips). Clearcoat/transmission need
- * non-standard effects — not mapped.
+ * No lights / cameras (Creator also skips). Transmission still out of scope.
+ */
 
 const crypto = require('crypto');
 const fs = require('fs');
@@ -21,6 +21,8 @@ const { encodeCCONBinary } = require('./ccon.cjs');
 
 const GLTF_EXTS = new Set(['.gltf', '.glb']);
 const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
+// advanced/car-paint.effect — used when KHR_materials_clearcoat is present
+const CAR_PAINT_EFFECT = '304a12db-3955-46e4-b712-e5e26f45258b';
 
 // Cocos GFX Format enum values used in Mesh._struct
 const FMT = { RG32F: 21, RGB32F: 32, RGBA8: 35, RGBA16UI: 42, RGBA32F: 44 };
@@ -1217,7 +1219,7 @@ function tilingOffsetFromTextureInfo(texInfo) {
 }
 
 /**
- * Build builtin-standard Material from a glTF material.
+ * Build Material from a glTF material (builtin-standard, or car-paint when clearcoat).
  * Maps:
  *   baseColorTexture → mainTexture / USE_ALBEDO_MAP (+ ALBEDO_UV)
  *   normalTexture → normalMap / USE_NORMAL_MAP (+ NORMAL_UV)
@@ -1226,9 +1228,7 @@ function tilingOffsetFromTextureInfo(texInfo) {
  *   emissiveTexture → emissiveMap / USE_EMISSIVE_MAP (+ EMISSIVE_UV)
  *   texCoord=1 → HAS_SECOND_UV + v_uv1 macros
  *   KHR_texture_transform on baseColor → tilingOffset
- *
- * Note: KHR_materials_clearcoat / transmission are not on builtin-standard
- * (Creator uses advanced/car-paint etc.) — out of scope here.
+ *   KHR_materials_clearcoat → car-paint effect + coatRoughness / coatIntensity
  *
  * @param {object} mat glTF material
  * @param {string[]} textureIds texture sub-uuids by glTF texture index
@@ -1245,6 +1245,7 @@ function materialJson(mat, textureIds, options = {}) {
   };
   const defines = [{}];
   let needsSecondUv = false;
+  let effectUuid = STANDARD_EFFECT;
 
   if (options.useVertexColor) {
     defines[0].USE_VERTEX_COLOR = true;
@@ -1313,6 +1314,43 @@ function materialJson(mat, textureIds, options = {}) {
     defines[0].HAS_SECOND_UV = true;
   }
 
+  // KHR_materials_clearcoat → advanced/car-paint (builtin-standard has no coat)
+  const clearcoat =
+    mat.extensions && mat.extensions.KHR_materials_clearcoat;
+  if (clearcoat) {
+    effectUuid = CAR_PAINT_EFFECT;
+    // Drop emissive map defines — car-paint has no emissive path
+    delete defines[0].USE_EMISSIVE_MAP;
+    delete defines[0].EMISSIVE_UV;
+    delete props.emissiveMap;
+    delete props.emissive;
+
+    props.coatRoughness =
+      clearcoat.clearcoatRoughnessFactor != null
+        ? clearcoat.clearcoatRoughnessFactor
+        : 0;
+    props.coatIntensity =
+      clearcoat.clearcoatFactor != null ? clearcoat.clearcoatFactor : 0;
+    props.coatOpacity = 1;
+    props.coatIOR = 1.5;
+    props.coatColor = {
+      __type__: 'cc.Color',
+      r: 255,
+      g: 255,
+      b: 255,
+      a: 255,
+    };
+
+    // Creator coatDataMap: R=roughness G=intensity B=opacity (≠ glTF packing).
+    // Prefer clearcoatRoughnessTexture; fall back to clearcoatTexture.
+    const coatTex =
+      clearcoat.clearcoatRoughnessTexture || clearcoat.clearcoatTexture;
+    if (coatTex && coatTex.index != null && textureIds[coatTex.index]) {
+      props.coatDataMap = texRef(textureIds[coatTex.index]);
+      defines[0].USE_COAT_DATA_MAP = true;
+    }
+  }
+
   // doubleSided → CullMode.NONE (0); else BACK (1)
   const cullMode = mat.doubleSided ? 0 : 1;
   if (mat.doubleSided) defines[0].USE_TWOSIDE = true;
@@ -1344,7 +1382,7 @@ function materialJson(mat, textureIds, options = {}) {
     __editorExtras__: {},
     _native: '',
     _effectAsset: {
-      __uuid__: STANDARD_EFFECT,
+      __uuid__: effectUuid,
       __expectedType__: 'cc.EffectAsset',
     },
     _techIdx: techIdx,
@@ -1701,6 +1739,7 @@ function importGltf(assetPath, libraryRoot) {
 module.exports = {
   GLTF_EXTS,
   STANDARD_EFFECT,
+  CAR_PAINT_EFFECT,
   importGltf,
   loadGltf,
   parseGlb,
