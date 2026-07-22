@@ -70,7 +70,7 @@ Creator remains useful for authoring and one-time snapshots. Day-to-day preview 
 | Fonts | TTF → `TTFFont`; BMFont (`.fnt` + pages) → `BitmapFont` |
 | Spine | 3.8 & 4.2 (`.skel` / JSON + atlas), version from project settings |
 | Particles / atlases | `.plist` → `ParticleAsset` or `SpriteAtlas` |
-| glTF / GLB | Hierarchy + anims + skins + morphs → Mesh / Skeleton / prefab |
+| glTF / GLB | Hierarchy + anims + skins + morphs + PBR maps → Mesh / Skeleton / prefab |
 | FBX | Via Creator `FBX2glTF` → same glTF pipeline |
 | Poly Haven | Fetch CC0 models → `importGltf` ([docs](./docs/polyhaven.md)) |
 | Text | `.txt` / `.csv` / `.yaml` / `.md` / … → `TextAsset` |

@@ -5,8 +5,9 @@
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT] [/ JOINTS+WEIGHTS]
- * [/ morph POSITION+NORMAL+TANGENT]), material + albedo, full node hierarchy,
- * ExoticAnimation clips, morph-weight RealArrayTracks, and skins. No lights / cameras.
+ * [/ morph POSITION+NORMAL+TANGENT]), PBR materials (albedo/normal/pbrMap/occlusion/
+ * emissive), full node hierarchy, ExoticAnimation clips, morph-weight tracks, and
+ * skins. No lights / cameras (Creator also skips).
  */
 
 const crypto = require('crypto');
@@ -1100,23 +1101,99 @@ function writeEmbeddedImage(assetPath, doc, imageIndex, changed) {
   return out;
 }
 
-function materialJson(name, textureUuid) {
+function texRef(uuid) {
+  return { __uuid__: uuid, __expectedType__: 'cc.Texture2D' };
+}
+
+function colorFromFactor(factor, fallback) {
+  const f = factor && factor.length >= 3 ? factor : fallback;
+  return {
+    __type__: 'cc.Color',
+    r: Math.round(Math.min(1, Math.max(0, f[0])) * 255),
+    g: Math.round(Math.min(1, Math.max(0, f[1])) * 255),
+    b: Math.round(Math.min(1, Math.max(0, f[2])) * 255),
+    a: Math.round(Math.min(1, Math.max(0, f[3] != null ? f[3] : 1)) * 255),
+  };
+}
+
+/**
+ * Build builtin-standard Material from a glTF material.
+ * Maps:
+ *   baseColorTexture → mainTexture / USE_ALBEDO_MAP
+ *   normalTexture → normalMap / USE_NORMAL_MAP
+ *   metallicRoughnessTexture → pbrMap / USE_PBR_MAP  (R=AO G=rough B=metal)
+ *   occlusionTexture → occlusionMap / USE_OCCLUSION_MAP (if separate from pbrMap)
+ *   emissiveTexture → emissiveMap / USE_EMISSIVE_MAP
+ *
+ * @param {object} mat glTF material
+ * @param {string[]} textureIds texture sub-uuids by glTF texture index
+ */
+function materialJson(mat, textureIds) {
+  const pbr = mat.pbrMetallicRoughness || {};
   const props = {
     tilingOffset: { __type__: 'cc.Vec4', x: 1, y: 1, z: 0, w: 0 },
-    metallic: 0,
-    occlusion: 0,
+    mainColor: colorFromFactor(pbr.baseColorFactor, [1, 1, 1, 1]),
+    metallic: pbr.metallicFactor != null ? pbr.metallicFactor : 1,
+    roughness: pbr.roughnessFactor != null ? pbr.roughnessFactor : 1,
+    occlusion: 1,
+    normalStrength: 1,
   };
   const defines = [{}];
-  if (textureUuid) {
-    props.mainTexture = {
-      __uuid__: textureUuid,
-      __expectedType__: 'cc.Texture2D',
-    };
+
+  const albedoIdx = pbr.baseColorTexture && pbr.baseColorTexture.index;
+  if (albedoIdx != null && textureIds[albedoIdx]) {
+    props.mainTexture = texRef(textureIds[albedoIdx]);
     defines[0].USE_ALBEDO_MAP = true;
   }
+
+  const normal = mat.normalTexture;
+  if (normal && normal.index != null && textureIds[normal.index]) {
+    props.normalMap = texRef(textureIds[normal.index]);
+    defines[0].USE_NORMAL_MAP = true;
+    if (normal.scale != null) props.normalStrength = normal.scale;
+  }
+
+  const mrIdx = pbr.metallicRoughnessTexture && pbr.metallicRoughnessTexture.index;
+  if (mrIdx != null && textureIds[mrIdx]) {
+    props.pbrMap = texRef(textureIds[mrIdx]);
+    defines[0].USE_PBR_MAP = true;
+  }
+
+  const occ = mat.occlusionTexture;
+  if (occ && occ.index != null && textureIds[occ.index]) {
+    // Separate AO map (when packed into ORM/pbrMap, Creator prefers USE_PBR_MAP only)
+    if (mrIdx == null || occ.index !== mrIdx) {
+      props.occlusionMap = texRef(textureIds[occ.index]);
+      defines[0].USE_OCCLUSION_MAP = true;
+    }
+    if (occ.strength != null) props.occlusion = occ.strength;
+  }
+
+  const emissive = mat.emissiveTexture;
+  if (emissive && emissive.index != null && textureIds[emissive.index]) {
+    props.emissiveMap = texRef(textureIds[emissive.index]);
+    defines[0].USE_EMISSIVE_MAP = true;
+  }
+  if (mat.emissiveFactor && mat.emissiveFactor.length >= 3) {
+    props.emissive = colorFromFactor(
+      [mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2], 1],
+      [0, 0, 0, 1],
+    );
+  }
+
+  // doubleSided → disable back-face cull (CullMode.NONE = 0 in GFX? BACK=1, FRONT=2, NONE=0)
+  // Creator: CullMode.NONE = 0, BACK = 1, FRONT = 2
+  const cullMode = mat.doubleSided ? 0 : 1;
+
+  // Alpha mode
+  if (mat.alphaMode === 'MASK') {
+    defines[0].USE_ALPHA_TEST = true;
+    props.alphaThreshold = mat.alphaCutoff != null ? mat.alphaCutoff : 0.5;
+  }
+
   return {
     __type__: 'cc.Material',
-    _name: name || '',
+    _name: mat.name || '',
     _objFlags: 0,
     __editorExtras__: {},
     _native: '',
@@ -1127,7 +1204,7 @@ function materialJson(name, textureUuid) {
     _techIdx: 0,
     _defines: defines,
     _states: [{
-      rasterizerState: { cullMode: 0 },
+      rasterizerState: { cullMode },
       blendState: { targets: [{}] },
       depthStencilState: {},
     }],
@@ -1153,8 +1230,14 @@ function findExistingSubId(meta, importer, gltfIndex, nameHint) {
   const subs = meta.subMetas || {};
   for (const [id, sub] of Object.entries(subs)) {
     if (sub.importer !== importer) continue;
-    if (sub.userData && sub.userData.gltfIndex === gltfIndex) return id;
-    if (nameHint && (sub.name === nameHint || (sub.name || '').startsWith(nameHint))) return id;
+    if (
+      gltfIndex != null
+      && sub.userData
+      && sub.userData.gltfIndex === gltfIndex
+    ) {
+      return id;
+    }
+    if (nameHint && sub.name === nameHint) return id;
   }
   return null;
 }
@@ -1224,9 +1307,7 @@ function importGltf(assetPath, libraryRoot) {
     const imageUuid = imageUuidByIndex.get(src);
     if (!imageUuid) continue;
     const name = `${tex.name || images[src]?.name || `tex_${i}`}.texture`;
-    let id = findExistingSubId(meta, 'texture', i, name)
-      || findExistingSubId(meta, 'texture', undefined, name)
-      || shortId('texture', i, name);
+    let id = findExistingSubId(meta, 'texture', i, name) || shortId('texture', i, name);
     const subUuid = `${uuid}@${id}`;
     const sampler = samplers[tex.sampler || 0] || {};
     meta.subMetas[id] = {
@@ -1236,6 +1317,7 @@ function importGltf(assetPath, libraryRoot) {
       id,
       name,
       userData: {
+        gltfIndex: i,
         wrapModeS: sampler.wrapS === 33071 ? 'clamp-to-edge' : 'repeat',
         wrapModeT: sampler.wrapT === 33071 ? 'clamp-to-edge' : 'repeat',
         minfilter: 'nearest',
@@ -1263,12 +1345,6 @@ function importGltf(assetPath, libraryRoot) {
     const name = `${mat.name || `material_${i}`}.material`;
     let id = findExistingSubId(meta, 'gltf-material', i, name) || shortId('material', i, name);
     const subUuid = `${uuid}@${id}`;
-    let texSub = null;
-    const baseColorTex = mat.pbrMetallicRoughness
-      && mat.pbrMetallicRoughness.baseColorTexture
-      && mat.pbrMetallicRoughness.baseColorTexture.index;
-    if (baseColorTex != null && textureIds[baseColorTex]) texSub = textureIds[baseColorTex];
-    else if (textureIds[0]) texSub = textureIds[0];
     meta.subMetas[id] = {
       importer: 'gltf-material',
       uuid: subUuid,
@@ -1281,7 +1357,7 @@ function importGltf(assetPath, libraryRoot) {
       files: ['.json'],
       subMetas: {},
     };
-    if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), materialJson(mat.name || name, texSub))) {
+    if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), materialJson(mat, textureIds))) {
       changed.push(`${subUuid}.json`);
     }
     materialIds.push(subUuid);
