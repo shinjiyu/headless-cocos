@@ -22,6 +22,7 @@ Technical docs for **headless-cocos** (Creator 3.8 headless preview).
 - [importer-bmfont-spine.md](importer-bmfont-spine.md)
 - [importer-plist.md](importer-plist.md)
 - [importer-gltf.md](importer-gltf.md)
+- [polyhaven.md](polyhaven.md)
 - [importer-anim-text.md](importer-anim-text.md)
 
 ### Research notes (`../notes/`)

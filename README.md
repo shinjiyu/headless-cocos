@@ -72,6 +72,7 @@ Creator remains useful for authoring and one-time snapshots. Day-to-day preview 
 | Particles / atlases | `.plist` → `ParticleAsset` or `SpriteAtlas` |
 | glTF / GLB | Hierarchy + anims + skins + morphs → Mesh / Skeleton / prefab |
 | FBX | Via Creator `FBX2glTF` → same glTF pipeline |
+| Poly Haven | Fetch CC0 models → `importGltf` ([docs](./docs/polyhaven.md)) |
 | Text | `.txt` / `.csv` / `.yaml` / `.md` / … → `TextAsset` |
 | JSON data | Plain JSON → `JsonAsset` |
 | Clips / graphs | `.anim` / `.animgraph` (+ marionette when enabled) |
@@ -208,6 +209,8 @@ node .\spike\e2e-bundle.cjs
 | [Getting started](./docs/getting-started.md) | Snapshot, first run, troubleshooting |
 | [Architecture](./docs/architecture.md) | Mirror, packer overlay, settings |
 | [Importers](./docs/importers.md) | Asset pipeline contracts |
+| [glTF / FBX](./docs/importer-gltf.md) | 3D mesh / skin / morph / animation |
+| [Poly Haven](./docs/polyhaven.md) | Online CC0 model fetch → import |
 | [Docker](./docs/docker.md) | Image bake & compose |
 | [Bundles](./docs/bundle-support.md) | Asset Bundle synthesis |
 | [Docs index](./docs/README.md) | Full index |

@@ -4,9 +4,9 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 
 ## Scope
 
-| Supported | Not yet |
-|-----------|---------|
-| `.gltf` + external `.bin` / images | Cameras / lights |
+| Supported | Not yet / out of scope |
+|-----------|------------------------|
+| `.gltf` + external `.bin` / images | Cameras / lights (**Creator also skips** — not planned) |
 | `.glb` (JSON + BIN chunks) | |
 | `.fbx` via Creator `FBX2glTF` → glTF | |
 | POSITION / NORMAL / TEXCOORD_0 / TANGENT | |
@@ -15,8 +15,9 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | **All meshes + all primitives** | |
 | **Full node hierarchy + TRS** → prefab | |
 | **Animations** → ExoticAnimation CCON (`.bin`) | |
-| Albedo texture (URI or embedded) | |
+| Albedo texture (URI or embedded) | Full PBR (normal / ORM maps — albedo only for now) |
 | Preserve Creator `.meta` sub-ids | |
+| **Poly Haven fetch** → `importGltf` (`docs/polyhaven.md`) | |
 
 ## Library products
 
@@ -47,7 +48,8 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
 
@@ -58,6 +60,7 @@ node .\spike\e2e-gltf-anim.cjs --disk-only
 node .\spike\e2e-gltf-skin.cjs
 node .\spike\e2e-gltf-skin.cjs --fbx
 node .\spike\e2e-gltf-morph.cjs
+node .\spike\e2e-polyhaven.cjs
 node .\spike\e2e-fbx.cjs
 ```
 
