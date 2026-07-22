@@ -8,7 +8,7 @@
  * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
  * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit +
- * emissive_strength),
+ * emissive_strength + ior/specular + anisotropy),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
  * No lights / cameras (Creator also skips). Transmission still out of scope.
  */
@@ -1198,6 +1198,35 @@ function colorFromFactor(factor, fallback) {
   };
 }
 
+/** Dielectric F0 from IOR: ((n-1)/(n+1))^2. Default ior 1.5 → 0.04. */
+function f0FromIor(ior) {
+  const n = ior != null ? ior : 1.5;
+  const t = (n - 1) / (n + 1);
+  return t * t;
+}
+
+/**
+ * Map KHR_materials_ior + KHR_materials_specular → specularIntensity.
+ * Creator default specularIntensity 0.5 ≈ F0(1.5)/0.08.
+ */
+function specularIntensityFromExtensions(mat) {
+  const exts = mat.extensions || {};
+  const iorExt = exts.KHR_materials_ior;
+  const specExt = exts.KHR_materials_specular;
+  if (!iorExt && !specExt) return null;
+
+  const ior = iorExt && iorExt.ior != null ? iorExt.ior : 1.5;
+  const f0 = f0FromIor(ior);
+  let intensity = f0 / 0.08;
+  if (specExt) {
+    const factor = specExt.specularFactor != null ? specExt.specularFactor : 1;
+    intensity *= factor;
+  }
+  if (intensity < 0) intensity = 0;
+  if (intensity > 1) intensity = 1;
+  return intensity;
+}
+
 function texCoordUvName(texInfo) {
   const set = texInfo && texInfo.texCoord != null ? texInfo.texCoord : 0;
   return set === 1 ? 'v_uv1' : 'v_uv';
@@ -1308,6 +1337,8 @@ function materialJsonUnlit(mat, textureIds, options = {}) {
  *   KHR_texture_transform on baseColor → tilingOffset
  *   KHR_materials_clearcoat → car-paint effect + coatRoughness / coatIntensity
  *   KHR_materials_emissive_strength → emissiveScale
+ *   KHR_materials_ior / specular → specularIntensity
+ *   KHR_materials_anisotropy → IS_ANISOTROPY + anisotropyIntensity/Rotation
  *
  * @param {object} mat glTF material
  * @param {string[]} textureIds texture sub-uuids by glTF texture index
@@ -1404,6 +1435,28 @@ function materialJson(mat, textureIds, options = {}) {
     };
   }
 
+  const specularIntensity = specularIntensityFromExtensions(mat);
+  if (specularIntensity != null) {
+    props.specularIntensity = specularIntensity;
+  }
+
+  // KHR_materials_anisotropy
+  const aniso = mat.extensions && mat.extensions.KHR_materials_anisotropy;
+  if (aniso) {
+    defines[0].IS_ANISOTROPY = true;
+    props.anisotropyIntensity =
+      aniso.anisotropyStrength != null ? aniso.anisotropyStrength : 0;
+    // Creator: anisotropyRotation in [0,1] → radians * PI; glTF is radians
+    const rotRad = aniso.anisotropyRotation != null ? aniso.anisotropyRotation : 0;
+    props.anisotropyRotation = rotRad / Math.PI;
+    const anisoTex = aniso.anisotropyTexture;
+    if (anisoTex && anisoTex.index != null && textureIds[anisoTex.index]) {
+      props.anisotropyMap = texRef(textureIds[anisoTex.index]);
+      defines[0].USE_ANISOTROPY_MAP = true;
+      if (texCoordUvName(anisoTex) === 'v_uv1') needsSecondUv = true;
+    }
+  }
+
   if (needsSecondUv) {
     defines[0].HAS_SECOND_UV = true;
   }
@@ -1413,12 +1466,17 @@ function materialJson(mat, textureIds, options = {}) {
     mat.extensions && mat.extensions.KHR_materials_clearcoat;
   if (clearcoat) {
     effectUuid = CAR_PAINT_EFFECT;
-    // Drop emissive map defines — car-paint has no emissive path
+    // Drop emissive / anisotropy — car-paint has no those paths
     delete defines[0].USE_EMISSIVE_MAP;
     delete defines[0].EMISSIVE_UV;
+    delete defines[0].IS_ANISOTROPY;
+    delete defines[0].USE_ANISOTROPY_MAP;
     delete props.emissiveMap;
     delete props.emissive;
     delete props.emissiveScale;
+    delete props.anisotropyIntensity;
+    delete props.anisotropyRotation;
+    delete props.anisotropyMap;
 
     props.coatRoughness =
       clearcoat.clearcoatRoughnessFactor != null
