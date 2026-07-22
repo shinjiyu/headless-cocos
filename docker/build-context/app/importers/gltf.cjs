@@ -6,10 +6,11 @@
  *
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
  * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
- * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color),
+ * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
+ * texCoord UV sets + KHR_texture_transform),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
- * No lights / cameras (Creator also skips).
- */
+ * No lights / cameras (Creator also skips). Clearcoat/transmission need
+ * non-standard effects — not mapped.
 
 const crypto = require('crypto');
 const fs = require('fs');
@@ -1192,14 +1193,42 @@ function colorFromFactor(factor, fallback) {
   };
 }
 
+function texCoordUvName(texInfo) {
+  const set = texInfo && texInfo.texCoord != null ? texInfo.texCoord : 0;
+  return set === 1 ? 'v_uv1' : 'v_uv';
+}
+
+/** KHR_texture_transform → Creator tilingOffset (scale.xy, offset.zw). Rotation ignored. */
+function tilingOffsetFromTextureInfo(texInfo) {
+  const ext =
+    texInfo &&
+    texInfo.extensions &&
+    texInfo.extensions.KHR_texture_transform;
+  if (!ext) return null;
+  const scale = Array.isArray(ext.scale) ? ext.scale : [1, 1];
+  const offset = Array.isArray(ext.offset) ? ext.offset : [0, 0];
+  return {
+    __type__: 'cc.Vec4',
+    x: scale[0] != null ? scale[0] : 1,
+    y: scale[1] != null ? scale[1] : 1,
+    z: offset[0] != null ? offset[0] : 0,
+    w: offset[1] != null ? offset[1] : 0,
+  };
+}
+
 /**
  * Build builtin-standard Material from a glTF material.
  * Maps:
- *   baseColorTexture → mainTexture / USE_ALBEDO_MAP
- *   normalTexture → normalMap / USE_NORMAL_MAP
+ *   baseColorTexture → mainTexture / USE_ALBEDO_MAP (+ ALBEDO_UV)
+ *   normalTexture → normalMap / USE_NORMAL_MAP (+ NORMAL_UV)
  *   metallicRoughnessTexture → pbrMap / USE_PBR_MAP  (R=AO G=rough B=metal)
  *   occlusionTexture → occlusionMap / USE_OCCLUSION_MAP (if separate from pbrMap)
- *   emissiveTexture → emissiveMap / USE_EMISSIVE_MAP
+ *   emissiveTexture → emissiveMap / USE_EMISSIVE_MAP (+ EMISSIVE_UV)
+ *   texCoord=1 → HAS_SECOND_UV + v_uv1 macros
+ *   KHR_texture_transform on baseColor → tilingOffset
+ *
+ * Note: KHR_materials_clearcoat / transmission are not on builtin-standard
+ * (Creator uses advanced/car-paint etc.) — out of scope here.
  *
  * @param {object} mat glTF material
  * @param {string[]} textureIds texture sub-uuids by glTF texture index
@@ -1215,27 +1244,43 @@ function materialJson(mat, textureIds, options = {}) {
     normalStrength: 1,
   };
   const defines = [{}];
+  let needsSecondUv = false;
 
   if (options.useVertexColor) {
     defines[0].USE_VERTEX_COLOR = true;
   }
-  const albedoIdx = pbr.baseColorTexture && pbr.baseColorTexture.index;
+
+  const albedoInfo = pbr.baseColorTexture;
+  const albedoIdx = albedoInfo && albedoInfo.index;
   if (albedoIdx != null && textureIds[albedoIdx]) {
     props.mainTexture = texRef(textureIds[albedoIdx]);
     defines[0].USE_ALBEDO_MAP = true;
+    const uv = texCoordUvName(albedoInfo);
+    defines[0].ALBEDO_UV = uv;
+    if (uv === 'v_uv1') needsSecondUv = true;
+    const to = tilingOffsetFromTextureInfo(albedoInfo);
+    if (to) props.tilingOffset = to;
   }
 
   const normal = mat.normalTexture;
   if (normal && normal.index != null && textureIds[normal.index]) {
     props.normalMap = texRef(textureIds[normal.index]);
     defines[0].USE_NORMAL_MAP = true;
+    const uv = texCoordUvName(normal);
+    defines[0].NORMAL_UV = uv;
+    if (uv === 'v_uv1') needsSecondUv = true;
     if (normal.scale != null) props.normalStrength = normal.scale;
   }
 
-  const mrIdx = pbr.metallicRoughnessTexture && pbr.metallicRoughnessTexture.index;
+  const mrInfo = pbr.metallicRoughnessTexture;
+  const mrIdx = mrInfo && mrInfo.index;
   if (mrIdx != null && textureIds[mrIdx]) {
     props.pbrMap = texRef(textureIds[mrIdx]);
     defines[0].USE_PBR_MAP = true;
+    // pbrMap uses DEFAULT_UV in effect — set when texCoord=1
+    const uv = texCoordUvName(mrInfo);
+    defines[0].DEFAULT_UV = uv;
+    if (uv === 'v_uv1') needsSecondUv = true;
   }
 
   const occ = mat.occlusionTexture;
@@ -1246,18 +1291,26 @@ function materialJson(mat, textureIds, options = {}) {
       defines[0].USE_OCCLUSION_MAP = true;
     }
     if (occ.strength != null) props.occlusion = occ.strength;
+    if (texCoordUvName(occ) === 'v_uv1') needsSecondUv = true;
   }
 
   const emissive = mat.emissiveTexture;
   if (emissive && emissive.index != null && textureIds[emissive.index]) {
     props.emissiveMap = texRef(textureIds[emissive.index]);
     defines[0].USE_EMISSIVE_MAP = true;
+    const uv = texCoordUvName(emissive);
+    defines[0].EMISSIVE_UV = uv;
+    if (uv === 'v_uv1') needsSecondUv = true;
   }
   if (mat.emissiveFactor && mat.emissiveFactor.length >= 3) {
     props.emissive = colorFromFactor(
       [mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2], 1],
       [0, 0, 0, 1],
     );
+  }
+
+  if (needsSecondUv) {
+    defines[0].HAS_SECOND_UV = true;
   }
 
   // doubleSided → CullMode.NONE (0); else BACK (1)
