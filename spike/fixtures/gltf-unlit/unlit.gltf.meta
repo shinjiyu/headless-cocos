@@ -1,0 +1,125 @@
+{
+  "uuid": "09b024ac-c7fb-4700-9a64-ca0d12c871d5",
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "files": [],
+  "subMetas": {
+    "27151": {
+      "importer": "gltf-mesh",
+      "uuid": "09b024ac-c7fb-4700-9a64-ca0d12c871d5@27151",
+      "displayName": "",
+      "id": "27151",
+      "name": "UnlitTri.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 1
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "d0a91": {
+      "importer": "texture",
+      "uuid": "09b024ac-c7fb-4700-9a64-ca0d12c871d5@d0a91",
+      "displayName": "",
+      "id": "d0a91",
+      "name": "tex_0.texture",
+      "userData": {
+        "gltfIndex": 0,
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "nearest",
+        "magfilter": "nearest",
+        "mipfilter": "nearest",
+        "anisotropy": 0,
+        "isUuid": false,
+        "imageUuidOrDatabaseUri": "9812cc48-9465-4f18-83c7-863281030206"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "51f36": {
+      "importer": "gltf-material",
+      "uuid": "09b024ac-c7fb-4700-9a64-ca0d12c871d5@51f36",
+      "displayName": "",
+      "id": "51f36",
+      "name": "unlit_green.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "ce479": {
+      "importer": "gltf-scene",
+      "uuid": "09b024ac-c7fb-4700-9a64-ca0d12c871d5@ce479",
+      "displayName": "",
+      "id": "ce479",
+      "name": "unlit.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "albedo",
+        "uri": "albedo.png"
+      }
+    ],
+    "assetFinder": {
+      "meshes": [
+        "09b024ac-c7fb-4700-9a64-ca0d12c871d5@27151"
+      ],
+      "skeletons": [],
+      "textures": [
+        "09b024ac-c7fb-4700-9a64-ca0d12c871d5@d0a91"
+      ],
+      "materials": [
+        "09b024ac-c7fb-4700-9a64-ca0d12c871d5@51f36"
+      ],
+      "scenes": [
+        "09b024ac-c7fb-4700-9a64-ca0d12c871d5@ce479"
+      ]
+    },
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "imageFindOrder": []
+  }
+}

@@ -14,6 +14,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | `texCoord=1` → `HAS_SECOND_UV` / `*_UV: v_uv1` | |
 | **KHR_texture_transform** → `tilingOffset` | |
 | **KHR_materials_clearcoat** → `car-paint` effect | |
+| **KHR_materials_unlit** → `builtin-unlit` | |
 | **JOINTS_0 / WEIGHTS_0** + `gltf-skeleton` | |
 | **Morph targets** (POSITION [/ NORMAL / TANGENT]) + weight tracks | |
 | **All meshes + all primitives** | |
@@ -33,7 +34,7 @@ Root meta: `importer: "gltf"` (or `"fbx"`), `files: []`.
 |-----|----------|-------|
 | mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive; optional color/uv1; skinned stride 72+; morph deltas) |
 | texture | `texture` | `.json` |
-| material | `gltf-material` | `.json` (builtin-standard or **car-paint** for clearcoat; UV sets; texture_transform; MASK/BLEND) |
+| material | `gltf-material` | `.json` (standard / **unlit** / **car-paint**; UV sets; texture_transform; MASK/BLEND) |
 | skeleton (per skin) | `gltf-skeleton` | `.json` (`_joints` paths + `_bindposes`) |
 | animation (per clip) | `gltf-animation` | `.bin` only (CCON v2 ExoticAnimation) |
 | scene | `gltf-scene` | hierarchy prefab + `Animation` / `SkeletalAnimation` |
@@ -54,7 +55,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -71,6 +72,7 @@ node .\spike\e2e-gltf-alpha.cjs
 node .\spike\e2e-gltf-color-uv1.cjs
 node .\spike\e2e-gltf-uv1-transform.cjs
 node .\spike\e2e-gltf-clearcoat.cjs
+node .\spike\e2e-gltf-unlit.cjs
 node .\spike\e2e-polyhaven.cjs
 node .\spike\e2e-fbx.cjs
 ```
@@ -116,3 +118,8 @@ Clearcoat (`fixtures/gltf-clearcoat/clearcoat.gltf`):
 - `KHR_materials_clearcoat` → effect `car-paint` (`304a12db-…`)
 - `clearcoatFactor` → `coatIntensity`; `clearcoatRoughnessFactor` → `coatRoughness`
 - Optional coat textures → `coatDataMap` (Creator channel pack differs from glTF)
+
+Unlit (`fixtures/gltf-unlit/unlit.gltf`):
+
+- `KHR_materials_unlit` → effect `builtin-unlit` (`a3cd009f-…`)
+- baseColor → `mainColor` / `USE_TEXTURE` (not PBR maps)

@@ -7,7 +7,7 @@
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
  * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
- * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint),
+ * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
  * No lights / cameras (Creator also skips). Transmission still out of scope.
  */
@@ -23,6 +23,8 @@ const GLTF_EXTS = new Set(['.gltf', '.glb']);
 const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
 // advanced/car-paint.effect — used when KHR_materials_clearcoat is present
 const CAR_PAINT_EFFECT = '304a12db-3955-46e4-b712-e5e26f45258b';
+// builtin-unlit.effect — used when KHR_materials_unlit is present
+const UNLIT_EFFECT = 'a3cd009f-0ab0-420d-9278-b9fdab939bbc';
 
 // Cocos GFX Format enum values used in Mesh._struct
 const FMT = { RG32F: 21, RGB32F: 32, RGBA8: 35, RGBA16UI: 42, RGBA32F: 44 };
@@ -1218,9 +1220,84 @@ function tilingOffsetFromTextureInfo(texInfo) {
   };
 }
 
+/** Alpha / cull state shared by standard, car-paint, and unlit materials. */
+function materialAlphaAndCull(mat, defines) {
+  const cullMode = mat.doubleSided ? 0 : 1;
+  if (mat.doubleSided) defines[0].USE_TWOSIDE = true;
+
+  let techIdx = 0;
+  let blendState = { targets: [{}] };
+  let depthStencilState = {};
+  if (mat.alphaMode === 'MASK') {
+    defines[0].USE_ALPHA_TEST = true;
+  } else if (mat.alphaMode === 'BLEND') {
+    techIdx = 1;
+    depthStencilState = { depthTest: true, depthWrite: false };
+    blendState = {
+      targets: [{
+        blend: true,
+        blendSrc: 2, // SRC_ALPHA
+        blendDst: 4, // ONE_MINUS_SRC_ALPHA
+        blendDstAlpha: 4,
+      }],
+    };
+  }
+  return { cullMode, techIdx, blendState, depthStencilState };
+}
+
 /**
- * Build Material from a glTF material (builtin-standard, or car-paint when clearcoat).
+ * KHR_materials_unlit → builtin-unlit (baseColor only, USE_TEXTURE).
+ */
+function materialJsonUnlit(mat, textureIds, options = {}) {
+  const pbr = mat.pbrMetallicRoughness || {};
+  const props = {
+    tilingOffset: { __type__: 'cc.Vec4', x: 1, y: 1, z: 0, w: 0 },
+    mainColor: colorFromFactor(pbr.baseColorFactor, [1, 1, 1, 1]),
+  };
+  const defines = [{}];
+  if (options.useVertexColor) defines[0].USE_VERTEX_COLOR = true;
+
+  const albedoInfo = pbr.baseColorTexture;
+  const albedoIdx = albedoInfo && albedoInfo.index;
+  if (albedoIdx != null && textureIds[albedoIdx]) {
+    props.mainTexture = texRef(textureIds[albedoIdx]);
+    defines[0].USE_TEXTURE = true;
+    const to = tilingOffsetFromTextureInfo(albedoInfo);
+    if (to) props.tilingOffset = to;
+  }
+  if (mat.alphaMode === 'MASK') {
+    props.alphaThreshold = mat.alphaCutoff != null ? mat.alphaCutoff : 0.5;
+  }
+
+  const { cullMode, techIdx, blendState, depthStencilState } = materialAlphaAndCull(mat, defines);
+  // unlit effect has no USE_TWOSIDE define — cull still applied via rasterizerState
+  delete defines[0].USE_TWOSIDE;
+
+  return {
+    __type__: 'cc.Material',
+    _name: mat.name || '',
+    _objFlags: 0,
+    __editorExtras__: {},
+    _native: '',
+    _effectAsset: {
+      __uuid__: UNLIT_EFFECT,
+      __expectedType__: 'cc.EffectAsset',
+    },
+    _techIdx: techIdx,
+    _defines: defines,
+    _states: [{
+      rasterizerState: { cullMode },
+      blendState,
+      depthStencilState,
+    }],
+    _props: [props],
+  };
+}
+
+/**
+ * Build Material from a glTF material (builtin-standard, unlit, or car-paint).
  * Maps:
+ *   KHR_materials_unlit → builtin-unlit (baseColor / USE_TEXTURE)
  *   baseColorTexture → mainTexture / USE_ALBEDO_MAP (+ ALBEDO_UV)
  *   normalTexture → normalMap / USE_NORMAL_MAP (+ NORMAL_UV)
  *   metallicRoughnessTexture → pbrMap / USE_PBR_MAP  (R=AO G=rough B=metal)
@@ -1234,6 +1311,10 @@ function tilingOffsetFromTextureInfo(texInfo) {
  * @param {string[]} textureIds texture sub-uuids by glTF texture index
  */
 function materialJson(mat, textureIds, options = {}) {
+  if (mat.extensions && mat.extensions.KHR_materials_unlit) {
+    return materialJsonUnlit(mat, textureIds, options);
+  }
+
   const pbr = mat.pbrMetallicRoughness || {};
   const props = {
     tilingOffset: { __type__: 'cc.Vec4', x: 1, y: 1, z: 0, w: 0 },
@@ -1351,29 +1432,11 @@ function materialJson(mat, textureIds, options = {}) {
     }
   }
 
-  // doubleSided → CullMode.NONE (0); else BACK (1)
-  const cullMode = mat.doubleSided ? 0 : 1;
-  if (mat.doubleSided) defines[0].USE_TWOSIDE = true;
-
-  // Alpha: MASK → alpha test; BLEND → transparent technique (_techIdx 1)
-  let techIdx = 0;
-  let blendState = { targets: [{}] };
-  let depthStencilState = {};
   if (mat.alphaMode === 'MASK') {
-    defines[0].USE_ALPHA_TEST = true;
     props.alphaThreshold = mat.alphaCutoff != null ? mat.alphaCutoff : 0.5;
-  } else if (mat.alphaMode === 'BLEND') {
-    techIdx = 1;
-    depthStencilState = { depthTest: true, depthWrite: false };
-    blendState = {
-      targets: [{
-        blend: true,
-        blendSrc: 2, // SRC_ALPHA
-        blendDst: 4, // ONE_MINUS_SRC_ALPHA
-        blendDstAlpha: 4,
-      }],
-    };
   }
+
+  const { cullMode, techIdx, blendState, depthStencilState } = materialAlphaAndCull(mat, defines);
 
   return {
     __type__: 'cc.Material',
@@ -1740,6 +1803,7 @@ module.exports = {
   GLTF_EXTS,
   STANDARD_EFFECT,
   CAR_PAINT_EFFECT,
+  UNLIT_EFFECT,
   importGltf,
   loadGltf,
   parseGlb,
