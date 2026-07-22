@@ -14,6 +14,7 @@
     "@electron/asar": "^4.2.0"
   },
   "dependencies": {
+    "draco3dgltf": "^1.5.7",
     "meshoptimizer": "^1.2.0"
   }
 }

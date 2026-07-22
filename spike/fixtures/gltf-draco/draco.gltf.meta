@@ -1,0 +1,94 @@
+{
+  "uuid": "12aba2a3-7073-4a34-b62b-6ce52302e829",
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "files": [],
+  "subMetas": {
+    "d6b8e": {
+      "importer": "gltf-material",
+      "uuid": "12aba2a3-7073-4a34-b62b-6ce52302e829@d6b8e",
+      "displayName": "",
+      "id": "d6b8e",
+      "name": "default.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "8c4ff": {
+      "importer": "gltf-mesh",
+      "uuid": "12aba2a3-7073-4a34-b62b-6ce52302e829@8c4ff",
+      "displayName": "",
+      "id": "8c4ff",
+      "name": "DracoTri.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 1
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "423e0": {
+      "importer": "gltf-scene",
+      "uuid": "12aba2a3-7073-4a34-b62b-6ce52302e829@423e0",
+      "displayName": "",
+      "id": "423e0",
+      "name": "draco.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "assetFinder": {
+      "meshes": [
+        "12aba2a3-7073-4a34-b62b-6ce52302e829@8c4ff"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "12aba2a3-7073-4a34-b62b-6ce52302e829@d6b8e"
+      ],
+      "scenes": [
+        "12aba2a3-7073-4a34-b62b-6ce52302e829@423e0"
+      ]
+    },
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "imageFindOrder": []
+  }
+}

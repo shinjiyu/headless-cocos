@@ -103,7 +103,7 @@ function parseGlb(buf) {
   }
   if (!json) throw new Error('GLB missing JSON chunk');
   const doc = { json, bin, buffers: [bin] };
-  return decodeMeshoptViews(doc);
+  return decodeDracoMeshes(decodeMeshoptViews(doc));
 }
 
 function loadBufferUri(assetPath, bufDesc) {
@@ -127,7 +127,7 @@ function loadGltf(assetPath) {
   const buffers = (json.buffers || []).map((b) => loadBufferUri(assetPath, b));
   const bin = buffers[0] || Buffer.alloc(0);
   const doc = { json, bin, buffers };
-  return decodeMeshoptViews(doc);
+  return decodeDracoMeshes(decodeMeshoptViews(doc));
 }
 
 // ---- meshopt (EXT_/KHR_meshopt_compression) ----
@@ -146,6 +146,197 @@ async function prepareMeshopt() {
   if (!MeshoptDecoder.supported) throw new Error('MeshoptDecoder not supported in this runtime');
   _meshoptDecoder = MeshoptDecoder;
   return _meshoptDecoder;
+}
+
+// ---- Draco (KHR_draco_mesh_compression) ----
+let _dracoModule = null;
+
+/** Await once before importing Draco-compressed glTFs (sync importGltf needs it ready). */
+async function prepareDraco() {
+  if (_dracoModule) return _dracoModule;
+  let createDecoderModule;
+  try {
+    ({ createDecoderModule } = require('draco3dgltf'));
+  } catch (err) {
+    throw new Error('draco3dgltf package required for Draco glTFs: npm i draco3dgltf');
+  }
+  _dracoModule = await createDecoderModule({});
+  return _dracoModule;
+}
+
+function requireDracoDecoder() {
+  if (_dracoModule) return _dracoModule;
+  throw new Error(
+    'Draco-compressed glTF: call await prepareDraco() before importGltf (or importGltfAsync)',
+  );
+}
+
+/** Prepare meshopt + Draco decoders (mirror boot / batch imports). */
+async function prepareGltfDecoders() {
+  await prepareMeshopt();
+  await prepareDraco();
+}
+
+function docNeedsDraco(json) {
+  for (const mesh of json.meshes || []) {
+    for (const prim of mesh.primitives || []) {
+      if (prim.extensions && prim.extensions.KHR_draco_mesh_compression) return true;
+    }
+  }
+  return false;
+}
+
+function gltfTypeFromComponents(n) {
+  if (n === 1) return 'SCALAR';
+  if (n === 2) return 'VEC2';
+  if (n === 3) return 'VEC3';
+  if (n === 4) return 'VEC4';
+  throw new Error(`draco: unsupported component count ${n}`);
+}
+
+/** Append bytes to doc.bin (4-byte aligned); returns byteOffset of the new payload. */
+function appendBufferBytes(doc, bytes) {
+  const pad = (4 - (doc.bin.length % 4)) % 4;
+  const offset = doc.bin.length + pad;
+  const parts = pad ? [doc.bin, Buffer.alloc(pad), bytes] : [doc.bin, bytes];
+  const bin = Buffer.concat(parts);
+  doc.bin = bin;
+  doc.buffers = [bin];
+  doc.json.buffers = [{ byteLength: bin.length }];
+  return offset;
+}
+
+function decodeOneDracoPrimitive(doc, prim, ext, module) {
+  const views = doc.json.bufferViews || [];
+  const view = views[ext.bufferView];
+  if (!view) throw new Error(`draco: missing bufferView ${ext.bufferView}`);
+  const srcBuf = getDocBuffer(doc, view.buffer);
+  const start = view.byteOffset || 0;
+  const len = view.byteLength != null ? view.byteLength : 0;
+  const data = new Int8Array(srcBuf.buffer, srcBuf.byteOffset + start, len);
+
+  const decoder = new module.Decoder();
+  const buffer = new module.DecoderBuffer();
+  buffer.Init(data, data.length);
+
+  try {
+    const geometryType = decoder.GetEncodedGeometryType(buffer);
+    if (geometryType !== module.TRIANGULAR_MESH) {
+      throw new Error('draco: only TRIANGULAR_MESH supported');
+    }
+    const mesh = new module.Mesh();
+    const status = decoder.DecodeBufferToMesh(buffer, mesh);
+    if (!status.ok() || !mesh.ptr) {
+      module.destroy(mesh);
+      throw new Error(`draco decode failed: ${status.error_msg()}`);
+    }
+
+    try {
+      const numPoints = mesh.num_points();
+      const numFaces = mesh.num_faces();
+      doc.json.accessors = doc.json.accessors || [];
+      doc.json.bufferViews = doc.json.bufferViews || [];
+
+      const newAttrs = {};
+      for (const [semantic, uniqueId] of Object.entries(ext.attributes || {})) {
+        const attribute = decoder.GetAttributeByUniqueId(mesh, uniqueId);
+        if (!attribute) throw new Error(`draco: missing attribute uniqueId ${uniqueId} (${semantic})`);
+        const numComp = attribute.num_components();
+        const values = new module.DracoFloat32Array();
+        decoder.GetAttributeFloatForAllPoints(mesh, attribute, values);
+        const arr = new Float32Array(numPoints * numComp);
+        for (let i = 0; i < arr.length; i++) arr[i] = values.GetValue(i);
+        module.destroy(values);
+
+        const bytes = Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
+        const byteOffset = appendBufferBytes(doc, bytes);
+        const bvIndex = doc.json.bufferViews.length;
+        doc.json.bufferViews.push({
+          buffer: 0,
+          byteOffset,
+          byteLength: bytes.length,
+          byteStride: numComp * 4,
+        });
+        const accessor = {
+          bufferView: bvIndex,
+          componentType: 5126,
+          count: numPoints,
+          type: gltfTypeFromComponents(numComp),
+        };
+        if (semantic === 'POSITION' && numComp >= 3) {
+          const min = [Infinity, Infinity, Infinity];
+          const max = [-Infinity, -Infinity, -Infinity];
+          for (let i = 0; i < numPoints; i++) {
+            for (let c = 0; c < 3; c++) {
+              const v = arr[i * 3 + c];
+              if (v < min[c]) min[c] = v;
+              if (v > max[c]) max[c] = v;
+            }
+          }
+          accessor.min = min;
+          accessor.max = max;
+        }
+        const accIndex = doc.json.accessors.length;
+        doc.json.accessors.push(accessor);
+        newAttrs[semantic] = accIndex;
+      }
+
+      const numIndices = numFaces * 3;
+      const indices = new Uint32Array(numIndices);
+      for (let f = 0; f < numFaces; f++) {
+        const face = new module.DracoInt32Array();
+        decoder.GetFaceFromMesh(mesh, f, face);
+        indices[f * 3] = face.GetValue(0);
+        indices[f * 3 + 1] = face.GetValue(1);
+        indices[f * 3 + 2] = face.GetValue(2);
+        module.destroy(face);
+      }
+
+      const use16 = numPoints <= 65535;
+      const ib = Buffer.alloc(numIndices * (use16 ? 2 : 4));
+      for (let i = 0; i < numIndices; i++) {
+        if (use16) ib.writeUInt16LE(indices[i], i * 2);
+        else ib.writeUInt32LE(indices[i], i * 4);
+      }
+      const ibOff = appendBufferBytes(doc, ib);
+      const ibv = doc.json.bufferViews.length;
+      doc.json.bufferViews.push({ buffer: 0, byteOffset: ibOff, byteLength: ib.length });
+      const iacc = doc.json.accessors.length;
+      doc.json.accessors.push({
+        bufferView: ibv,
+        componentType: use16 ? 5123 : 5125,
+        count: numIndices,
+        type: 'SCALAR',
+      });
+
+      prim.attributes = newAttrs;
+      prim.indices = iacc;
+    } finally {
+      module.destroy(mesh);
+    }
+  } finally {
+    module.destroy(decoder);
+    module.destroy(buffer);
+  }
+}
+
+/**
+ * Expand KHR_draco_mesh_compression primitives into dense accessors.
+ * Must run after meshopt expand so the Draco bitstream bufferView is readable.
+ */
+function decodeDracoMeshes(doc) {
+  if (!docNeedsDraco(doc.json)) return doc;
+  const module = requireDracoDecoder();
+  for (const mesh of doc.json.meshes || []) {
+    for (const prim of mesh.primitives || []) {
+      const ext = prim.extensions && prim.extensions.KHR_draco_mesh_compression;
+      if (!ext) continue;
+      decodeOneDracoPrimitive(doc, prim, ext, module);
+      delete prim.extensions.KHR_draco_mesh_compression;
+      if (prim.extensions && !Object.keys(prim.extensions).length) delete prim.extensions;
+    }
+  }
+  return doc;
 }
 
 function requireMeshoptDecoder() {
@@ -229,22 +420,26 @@ function decodeMeshoptViews(doc) {
   return doc;
 }
 
-/** Async import that prepares meshopt first. */
+/** Async import that prepares meshopt / Draco decoders as needed. */
 async function importGltfAsync(assetPath, libraryRoot, options) {
   const peekExt = path.extname(assetPath).toLowerCase();
   let needsMeshopt = false;
+  let needsDraco = false;
   try {
+    let json;
     if (peekExt === '.glb') {
-      const { json } = parseGlbRaw(fs.readFileSync(assetPath));
-      needsMeshopt = (json.bufferViews || []).some((v) => meshoptExt(v));
+      ({ json } = parseGlbRaw(fs.readFileSync(assetPath)));
     } else {
-      const json = JSON.parse(fs.readFileSync(assetPath, 'utf8'));
-      needsMeshopt = (json.bufferViews || []).some((v) => meshoptExt(v));
+      json = JSON.parse(fs.readFileSync(assetPath, 'utf8'));
     }
+    needsMeshopt = (json.bufferViews || []).some((v) => meshoptExt(v));
+    needsDraco = docNeedsDraco(json);
   } catch {
     needsMeshopt = true; // prepare anyway if peek fails
+    needsDraco = true;
   }
   if (needsMeshopt) await prepareMeshopt();
+  if (needsDraco) await prepareDraco();
   return importGltf(assetPath, libraryRoot, options);
 }
 
@@ -2074,6 +2269,8 @@ module.exports = {
   CAR_PAINT_EFFECT,
   UNLIT_EFFECT,
   prepareMeshopt,
+  prepareDraco,
+  prepareGltfDecoders,
   importGltf,
   importGltfAsync,
   loadGltf,

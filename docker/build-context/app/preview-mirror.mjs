@@ -81,7 +81,7 @@ const { BMFONT_EXTS, importBMFont } = bmfontImporter;
 const { importSpine, importSpineBinary, isSpineJson } = spineImporter;
 const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
-const { GLTF_EXTS, importGltf, prepareMeshopt } = gltfImporter;
+const { GLTF_EXTS, importGltf, prepareGltfDecoders } = gltfImporter;
 const { FBX_EXTS, importFbx } = fbxImporter;
 const { fetchModel, listModels } = polyhavenImporter;
 
@@ -1625,10 +1625,10 @@ server.listen(PORT, async () => {
   console.log('  UPSTREAM=' + (UPSTREAM || '(none)'));
   console.log('  HMR=ws://127.0.0.1:' + PORT + '/__hmr  (open WITHOUT autoReload=false)');
   try {
-    await prepareMeshopt();
-    console.log('[meshopt] decoder ready');
+    await prepareGltfDecoders();
+    console.log('[gltf-decoders] meshopt + Draco ready');
   } catch (err) {
-    console.warn('[meshopt] optional decoder unavailable:', err.message);
+    console.warn('[gltf-decoders] optional decoders unavailable:', err.message);
   }
   if (WATCH) {
     if (PACKER === 'mini') {
