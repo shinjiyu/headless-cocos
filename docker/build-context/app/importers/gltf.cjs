@@ -4,15 +4,16 @@
 /**
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
- * Scope (MVP): static meshes with POSITION / NORMAL / TEXCOORD_0 [/ TANGENT],
- * one material + albedo texture (external URI or embedded image), and a
- * MeshRenderer prefab for scene 0. No skins, morphs, animations, or lights.
+ * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT]), material + albedo,
+ * full node hierarchy prefab, and node-TRS animations as ExoticAnimation CCON
+ * (`gltf-animation`). No skins / morphs / lights.
  *
  * Library products (mirrors Creator's `gltf` importer shape):
  *   <uuid>@xxxxx.json/.bin   cc.Mesh
  *   <uuid>@xxxxx.json        cc.Texture2D  (mipmaps → ImageAsset uuid)
  *   <uuid>@xxxxx.json        cc.Material   (builtin standard effect)
- *   <uuid>@xxxxx.json        prefab array  (gltf-scene)
+ *   <uuid>@xxxxx.bin         cc.AnimationClip (CCON v2 ExoticAnimation)
+ *   <uuid>@xxxxx.json        prefab array  (gltf-scene + cc.Animation)
  *
  * Sub-meta ids are preserved when present in .meta; otherwise derived as
  * md5(`${kind}:${index}:${name}`).slice(0,5) so reimports stay stable.
@@ -23,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { importImage } = require('./image.cjs');
+const { encodeCCONBinary } = require('./ccon.cjs');
 
 const GLTF_EXTS = new Set(['.gltf', '.glb']);
 const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
@@ -403,12 +405,198 @@ function makeBakeSettings() {
   };
 }
 
+/** Collect every node index under the default scene (DFS). */
+function collectSceneNodeIndices(doc) {
+  const nodes = doc.json.nodes || [];
+  const scenes = doc.json.scenes || [];
+  const scene = scenes[doc.json.scene || 0] || scenes[0] || { nodes: nodes.length ? [0] : [] };
+  const roots = scene.nodes && scene.nodes.length ? scene.nodes : (nodes.length ? [0] : []);
+  const out = [];
+  const walk = (i) => {
+    out.push(i);
+    for (const c of (nodes[i].children || [])) walk(c);
+  };
+  for (const r of roots) walk(r);
+  return out;
+}
+
+/** Path from glTF scene-root down to node (ExoticAnimation path under wrapper). */
+function gltfNodePath(doc, nodeIndex) {
+  const nodes = doc.json.nodes || [];
+  const parentOf = new Map();
+  nodes.forEach((n, i) => {
+    for (const c of n.children || []) parentOf.set(c, i);
+  });
+  const parts = [];
+  let cur = nodeIndex;
+  while (cur != null) {
+    parts.unshift(nodes[cur].name || `node_${cur}`);
+    cur = parentOf.has(cur) ? parentOf.get(cur) : null;
+  }
+  return parts.join('/');
+}
+
+/**
+ * Build one gltf-animation CCON (cc.AnimationClip + ExoticAnimation).
+ * Every scene node gets constant TRS; channels override with keyframes.
+ */
+function buildAnimationClipCcon(doc, animIndex, sample) {
+  const anim = (doc.json.animations || [])[animIndex];
+  if (!anim) throw new Error(`missing animation ${animIndex}`);
+
+  const channelsByNode = new Map();
+  let duration = 0;
+  for (const ch of anim.channels || []) {
+    if (ch.target == null || ch.target.node == null) continue;
+    const pathName = ch.target.path;
+    if (pathName !== 'translation' && pathName !== 'rotation' && pathName !== 'scale') continue;
+    const sampler = (anim.samplers || [])[ch.sampler];
+    if (!sampler) continue;
+    const times = readAccessor(doc, sampler.input).values;
+    const values = readAccessor(doc, sampler.output).values;
+    if (times.length) duration = Math.max(duration, times[times.length - 1]);
+    let slot = channelsByNode.get(ch.target.node);
+    if (!slot) {
+      slot = {};
+      channelsByNode.set(ch.target.node, slot);
+    }
+    slot[pathName] = { times, values };
+  }
+  if (duration <= 0) duration = 1 / (sample || 30);
+
+  const nodeIndices = collectSceneNodeIndices(doc);
+  const document = [];
+  const floatParts = [];
+  let byteOffset = 0;
+
+  function pushFloats(arr) {
+    const f32 = arr instanceof Float32Array ? arr : Float32Array.from(arr);
+    const ref = {
+      __type__: 'TypedArrayRef',
+      ctor: 'Float32Array',
+      offset: byteOffset,
+      length: f32.length,
+    };
+    floatParts.push(Buffer.from(f32.buffer, f32.byteOffset, f32.byteLength));
+    byteOffset += f32.byteLength;
+    return ref;
+  }
+
+  function makeTrack(timesArr, valuesArr, valuesType) {
+    const trackId = document.length;
+    document.push({
+      __type__: 'cc.animation.ExoticTrack',
+      times: pushFloats(timesArr),
+      values: { __id__: trackId + 1 },
+    });
+    document.push({
+      __type__: valuesType,
+      _values: pushFloats(valuesArr),
+      _isQuantized: false,
+    });
+    return trackId;
+  }
+
+  document.push(null); // [0] clip placeholder
+  const exoticId = document.length;
+  document.push({
+    __type__: 'cc.animation.ExoticAnimation',
+    _nodeAnimations: [],
+  });
+
+  for (const ni of nodeIndices) {
+    const trs = nodeLocalTRS(doc.json.nodes[ni]);
+    const ch = channelsByNode.get(ni) || {};
+    const nodeAnimId = document.length;
+    const nodeAnim = {
+      __type__: 'cc.animation.ExoticNodeAnimation',
+      _path: gltfNodePath(doc, ni),
+    };
+    document.push(nodeAnim);
+    document[exoticId]._nodeAnimations.push({ __id__: nodeAnimId });
+
+    if (ch.translation) {
+      nodeAnim._position = {
+        __id__: makeTrack(ch.translation.times, ch.translation.values, 'cc.animation.ExoticVec3TrackValues'),
+      };
+    } else {
+      nodeAnim._position = {
+        __id__: makeTrack(
+          new Float32Array([0]),
+          new Float32Array([trs.pos.x, trs.pos.y, trs.pos.z]),
+          'cc.animation.ExoticVec3TrackValues',
+        ),
+      };
+    }
+    if (ch.rotation) {
+      nodeAnim._rotation = {
+        __id__: makeTrack(ch.rotation.times, ch.rotation.values, 'cc.animation.ExoticQuatTrackValues'),
+      };
+    } else {
+      nodeAnim._rotation = {
+        __id__: makeTrack(
+          new Float32Array([0]),
+          new Float32Array([trs.rot.x, trs.rot.y, trs.rot.z, trs.rot.w]),
+          'cc.animation.ExoticQuatTrackValues',
+        ),
+      };
+    }
+    if (ch.scale) {
+      nodeAnim._scale = {
+        __id__: makeTrack(ch.scale.times, ch.scale.values, 'cc.animation.ExoticVec3TrackValues'),
+      };
+    } else {
+      nodeAnim._scale = {
+        __id__: makeTrack(
+          new Float32Array([0]),
+          new Float32Array([trs.scale.x, trs.scale.y, trs.scale.z]),
+          'cc.animation.ExoticVec3TrackValues',
+        ),
+      };
+    }
+  }
+
+  const additiveId = document.length;
+  document.push({
+    __type__: 'cc.AnimationClipAdditiveSettings',
+    enabled: false,
+    refClip: null,
+  });
+
+  document[0] = {
+    __type__: 'cc.AnimationClip',
+    _name: anim.name || `animation_${animIndex}`,
+    _objFlags: 0,
+    __editorExtras__: {},
+    _native: '',
+    sample: sample || 30,
+    speed: 1,
+    wrapMode: 2,
+    enableTrsBlending: true,
+    _duration: duration,
+    _hash: 0,
+    _tracks: [],
+    _exoticAnimation: { __id__: exoticId },
+    _events: [],
+    _embeddedPlayers: [],
+    _additiveSettings: { __id__: additiveId },
+    _auxiliaryCurveEntries: [],
+  };
+
+  return {
+    name: document[0]._name,
+    duration,
+    bin: encodeCCONBinary(document, [Buffer.concat(floatParts)]),
+  };
+}
+
 /**
  * Build a Creator-style gltf-scene prefab:
  *   Prefab → outer wrapper node → glTF scene root(s) with full TRS hierarchy
  *   and MeshRenderer on every node that references a mesh.
+ *   Optional clipUuids → cc.Animation on the wrapper.
  */
-function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed, fallbackName) {
+function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed, fallbackName, clipUuids) {
   const nodes = doc.json.nodes || [];
   const scenes = doc.json.scenes || [];
   const scene = scenes[doc.json.scene || 0] || scenes[0] || { nodes: nodes.length ? [0] : [], name: fallbackName };
@@ -514,6 +702,32 @@ function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed
     const childId = nodeObjId.get(link.childGltfIndex);
     const slot = parent._children.find((c) => c.__id__ === -1);
     if (slot) slot.__id__ = childId;
+  }
+
+  if (clipUuids && clipUuids.length) {
+    const animId = out.length;
+    const compInfoId = animId + 1;
+    out[wrapperId]._components.push({ __id__: animId });
+    const defaultUuid = clipUuids[0];
+    out.push({
+      __type__: 'cc.Animation',
+      _name: '',
+      _objFlags: 0,
+      __editorExtras__: {},
+      node: { __id__: wrapperId },
+      _enabled: true,
+      __prefab: { __id__: compInfoId },
+      playOnLoad: false,
+      _clips: clipUuids.map((u) => ({
+        __uuid__: u,
+        __expectedType__: 'cc.AnimationClip',
+      })),
+      _defaultClip: defaultUuid
+        ? { __uuid__: defaultUuid, __expectedType__: 'cc.AnimationClip' }
+        : null,
+      _id: '',
+    });
+    out.push({ __type__: 'cc.CompPrefabInfo', fileId: fileIdFrom(`${seed}:anim`) });
   }
 
   // PrefabInfo for every node
@@ -799,6 +1013,53 @@ function importGltf(assetPath, libraryRoot) {
     meshMaterialSlots.push(built.materialIndices);
   }
 
+  // --- animations (ExoticAnimation CCON) ---
+  const animationIds = [];
+  const animList = doc.json.animations || [];
+  const sample = 30;
+  const animSettings = [];
+  for (let i = 0; i < animList.length; i++) {
+    const built = buildAnimationClipCcon(doc, i, sample);
+    const name = `${built.name}.animation`;
+    let id = findExistingSubId(meta, 'gltf-animation', i, name) || shortId('anim', i, name);
+    const subUuid = `${uuid}@${id}`;
+    meta.subMetas[id] = {
+      importer: 'gltf-animation',
+      uuid: subUuid,
+      displayName: '',
+      id,
+      name,
+      userData: {
+        gltfIndex: i,
+        wrapMode: 2,
+        sample,
+        span: { from: 0, to: built.duration },
+        events: [],
+      },
+      ver: '1.0.18',
+      imported: true,
+      files: ['.bin'],
+      subMetas: {},
+    };
+    if (writeBytesIfChanged(path.join(dir, `${subUuid}.bin`), built.bin)) {
+      changed.push(`${subUuid}.bin`);
+    }
+    animationIds.push(subUuid);
+    animSettings.push({
+      name: built.name,
+      duration: built.duration,
+      fps: sample,
+      splits: [{
+        name: built.name,
+        from: 0,
+        to: built.duration,
+        wrapMode: 2,
+        previousId: id,
+      }],
+    });
+  }
+  if (animSettings.length) meta.userData.animationImportSettings = animSettings;
+
   // --- scene prefab (full glTF node hierarchy) ---
   if (meshIds.some(Boolean) || (doc.json.nodes || []).length) {
     const name = `${baseName}.prefab`;
@@ -823,6 +1084,7 @@ function importGltf(assetPath, libraryRoot) {
       meshMaterialSlots,
       subUuid,
       baseName,
+      animationIds,
     );
     if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), prefab)) changed.push(`${subUuid}.json`);
     sceneIds.push(subUuid);
@@ -855,6 +1117,7 @@ function importGltf(assetPath, libraryRoot) {
     materials: materialIds,
     textures: textureIds,
     scenes: sceneIds,
+    animations: animationIds,
     changed,
   };
 }

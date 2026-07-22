@@ -8,10 +8,11 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 |-----------|---------|
 | `.gltf` + external `.bin` / images | Skins / joints |
 | `.glb` (JSON + BIN chunks) | Morph targets |
-| `.fbx` via Creator `FBX2glTF` → glTF | Animation clips (`.bin` CCON) |
-| POSITION / NORMAL / TEXCOORD_0 / TANGENT | Cameras / lights |
+| `.fbx` via Creator `FBX2glTF` → glTF | Cameras / lights |
+| POSITION / NORMAL / TEXCOORD_0 / TANGENT | |
 | **All meshes + all primitives** | |
 | **Full node hierarchy + TRS** → prefab | |
+| **Animations** → ExoticAnimation CCON (`.bin`) | |
 | Albedo texture (URI or embedded) | |
 | Preserve Creator `.meta` sub-ids | |
 
@@ -24,7 +25,8 @@ Root meta: `importer: "gltf"` (or `"fbx"`), `files: []`.
 | mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive OK) |
 | texture | `texture` | `.json` |
 | material | `gltf-material` | `.json` (builtin standard) |
-| scene | `gltf-scene` | hierarchy prefab |
+| animation (per clip) | `gltf-animation` | `.bin` only (CCON v2 ExoticAnimation) |
+| scene | `gltf-scene` | hierarchy prefab + `cc.Animation` |
 
 Standard effect: `c8f66d17-351a-48da-a12c-0212d28575c4`.
 
@@ -38,16 +40,18 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 
 ## Code
 
-- `spike/importers/gltf.cjs` — hierarchy + multi-prim
+- `spike/importers/gltf.cjs` — hierarchy + multi-prim + animations
+- `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs` (sand), `e2e-gltf-hierarchy.cjs` (character-a), `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs` (sand), `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-fbx.cjs`
 
 ## Verify
 
 ```powershell
 node .\spike\e2e-gltf.cjs
 node .\spike\e2e-gltf-hierarchy.cjs
+node .\spike\e2e-gltf-anim.cjs --disk-only
 node .\spike\e2e-fbx.cjs
 ```
 
@@ -55,3 +59,4 @@ Ground truth (`character-a.glb` from selfGame / Kenney):
 
 - 6 meshes, sub-ids preserved (`@00956` …)
 - Prefab: 9 nodes, 6 `MeshRenderer`, head scale `(0.1,0.1,0.1)`
+- 27 animation clips (idle `@1f586`), ExoticAnimation paths match Creator

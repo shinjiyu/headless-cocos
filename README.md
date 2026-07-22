@@ -70,7 +70,7 @@ Creator remains useful for authoring and one-time snapshots. Day-to-day preview 
 | Fonts | TTF → `TTFFont`; BMFont (`.fnt` + pages) → `BitmapFont` |
 | Spine | 3.8 & 4.2 (`.skel` / JSON + atlas), version from project settings |
 | Particles / atlases | `.plist` → `ParticleAsset` or `SpriteAtlas` |
-| glTF / GLB | Multi-mesh hierarchy → `Mesh` + `Material` + prefab |
+| glTF / GLB | Hierarchy + animations (ExoticAnimation CCON) → Mesh / Material / prefab |
 | FBX | Via Creator `FBX2glTF` → same glTF pipeline |
 | Text | `.txt` / `.csv` / `.yaml` / `.md` / … → `TextAsset` |
 | JSON data | Plain JSON → `JsonAsset` |
