@@ -70,7 +70,8 @@ Creator 仍可用于编辑与一次性快照；日常预览迭代不必常开。
 | 字体 | TTF → `TTFFont`；BMFont → `BitmapFont` |
 | Spine | 3.8 & 4.2，按工程设置选运行时 |
 | 粒子 / 图集 | `.plist` → `ParticleAsset` 或 `SpriteAtlas` |
-| glTF / GLB（MVP） | 静态网格 → `Mesh` + `Material` + prefab |
+| glTF / GLB | 多 mesh 节点树 → `Mesh` + `Material` + prefab |
+| FBX | 经 Creator `FBX2glTF` 转入同一管线 |
 | 文本 | `.txt` / `.csv` / `.yaml` / … → `TextAsset` |
 | 数据 JSON | 普通 JSON → `JsonAsset` |
 | 动画 | `.anim` / `.animgraph` |

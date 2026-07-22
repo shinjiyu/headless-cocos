@@ -29,7 +29,8 @@ Incremental: asset watcher in `PACKER=mini` mode.
 | `.fnt` + page PNGs | `importers/bmfont.cjs` | `BitmapFont` | |
 | `.skel` / Spine JSON + `.atlas` | `importers/spine.cjs` | `sp.SkeletonData` | 3.8 & 4.2; runtime via import-map |
 | `.plist` | `importers/plist.cjs` | `ParticleAsset` or `SpriteAtlas` | Auto-classified |
-| `.gltf` `.glb` | `importers/gltf.cjs` | `Mesh` / `Material` / `Texture2D` / prefab | Static mesh MVP; see [importer-gltf.md](importer-gltf.md) |
+| `.gltf` `.glb` | `importers/gltf.cjs` | `Mesh` / `Material` / `Texture2D` / hierarchy prefab | Multi-mesh + TRS; see [importer-gltf.md](importer-gltf.md) |
+| `.fbx` | `importers/fbx.cjs` | same (via FBX2glTF) | Needs Creator `FBX2glTF` binary |
 | `.txt` `.csv` `.yaml` `.yml` `.conf` `.md` | `importers/text.cjs` | `TextAsset` | |
 | Plain `.json` (no `__type__`) | mirror `importJsonAsset` | `JsonAsset` | Wraps `{ json: … }` |
 | Spine JSON | spine importer | `SkeletonData` | Detected via `isSpineJson` |
@@ -90,7 +91,8 @@ Wrong index → 404 (`…uuid.png` requested for a `.jpg` file).
 | `spike/e2e-spine-binary.cjs` | Spine 3.8 `.skel` |
 | `spike/e2e-spine42-binary.cjs` | Spine 4.2 `.skel` |
 | `spike/e2e-plist.cjs` | Particle + SpriteAtlas |
-| `spike/e2e-gltf.cjs` | glTF Mesh + Prefab |
+| `spike/e2e-gltf.cjs` | glTF Mesh + Prefab (sand) |
+| `spike/e2e-gltf-hierarchy.cjs` | Multi-mesh hierarchy (character-a) |
 | `spike/e2e-anim-text.cjs` | AnimationClip + AnimationGraph + TextAsset |
 | `spike/e2e-bundle.cjs` | Custom bundle loadBundle + path load |
 | `spike/e2e-prefab.cjs` / `e2e-scene-*.cjs` | Prefab / scene sync |

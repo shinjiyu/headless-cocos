@@ -30,4 +30,5 @@ spike/mirror*.log
 spike/chrome.err
 trace/
 **/._gltf_embed_*
+**/._fbx_*
 

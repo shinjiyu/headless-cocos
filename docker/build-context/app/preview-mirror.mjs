@@ -25,6 +25,8 @@ import spineImporter from './importers/spine.cjs';
 import plistImporter from './importers/plist.cjs';
 import textImporter from './importers/text.cjs';
 import gltfImporter from './importers/gltf.cjs';
+import fbxImporter from './importers/fbx.cjs';
+import fbxImporter from './importers/fbx.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
@@ -80,6 +82,8 @@ const { importSpine, importSpineBinary, isSpineJson } = spineImporter;
 const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
 const { GLTF_EXTS, importGltf } = gltfImporter;
+const { FBX_EXTS, importFbx } = fbxImporter;
+const { FBX_EXTS, importFbx } = fbxImporter;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -1021,7 +1025,7 @@ function importGltfLogged(absPath, label) {
       console.log(
         '[gltf-import]',
         label,
-        `meshes=${r.meshes.length}`,
+        `meshes=${r.meshes.filter(Boolean).length}`,
         `mats=${r.materials.length}`,
         `→ ${r.uuid}`,
       );
@@ -1029,6 +1033,41 @@ function importGltfLogged(absPath, label) {
     return r;
   } catch (err) {
     console.warn('[gltf-import] failed', label, err.message);
+    return null;
+  }
+}
+function importFbxLogged(absPath, label) {
+  try {
+    const r = importFbx(absPath, LIBRARY);
+    if (r && r.changed.length) {
+      console.log(
+        '[fbx-import]',
+        label,
+        `meshes=${r.meshes.filter(Boolean).length}`,
+        `→ ${r.uuid}`,
+      );
+    }
+    return r;
+  } catch (err) {
+    console.warn('[fbx-import] failed', label, err.message);
+    return null;
+  }
+}
+function importFbxLogged(absPath, label) {
+  try {
+    const r = importFbx(absPath, LIBRARY);
+    if (r && r.changed.length) {
+      console.log(
+        '[fbx-import]',
+        label,
+        `via=${path.basename(r.via || '')}`,
+        `meshes=${r.meshes.length}`,
+        `→ ${r.uuid}`,
+      );
+    }
+    return r;
+  } catch (err) {
+    console.warn('[fbx-import] failed', label, err.message);
     return null;
   }
 }
@@ -1121,6 +1160,12 @@ function bootSyncAssets() {
         }
       } else if (GLTF_EXTS.has(path.extname(e.name).toLowerCase())) {
         const r = importGltfLogged(p, path.relative(ASSETS, p));
+        if (r) {
+          images++;
+          r.changed.length ? synced++ : skipped++;
+        }
+      } else if (FBX_EXTS.has(path.extname(e.name).toLowerCase())) {
+        const r = importFbxLogged(p, path.relative(ASSETS, p));
         if (r) {
           images++;
           r.changed.length ? synced++ : skipped++;
@@ -1458,6 +1503,11 @@ server.listen(PORT, () => {
           if (fs.existsSync(abs)) importGltfLogged(abs, rel);
           return;
         }
+        if (FBX_EXTS.has(ext)) {
+          const abs = path.join(ASSETS, rel);
+          if (fs.existsSync(abs)) importFbxLogged(abs, rel);
+          return;
+        }
         if (TEXT_EXTS.has(ext)) {
           const abs = path.join(ASSETS, rel);
           if (!fs.existsSync(abs)) return;
@@ -1500,7 +1550,7 @@ server.listen(PORT, () => {
       if (WATCH_POLL) {
         makePollingWatcher(ASSETS, (_kind, rel) => onAssetChange(rel), {
           skipRegex: /\.git|\.meta\.tmp$|~$/,
-          isTracked: (name) => /\.(ts|js|meta|scene|prefab|mtl|anim|animgraph|json|skel|png|jpe?g|mp3|wav|ogg|aac|m4a|ttf|fnt|atlas|plist|txt|csv|ya?ml|conf|md|gltf|glb)$/i.test(name),
+          isTracked: (name) => /\.(ts|js|meta|scene|prefab|mtl|anim|animgraph|json|skel|png|jpe?g|mp3|wav|ogg|aac|m4a|ttf|fnt|atlas|plist|txt|csv|ya?ml|conf|md|gltf|glb|fbx)$/i.test(name),
         });
       }
       // Prime: sync all JSON assets once, then build scripts once

@@ -160,31 +160,29 @@ function readIndices(doc, accessorIndex) {
   return out;
 }
 
-function buildInterleavedMesh(doc, primitive) {
+function buildPrimitiveBuffers(doc, primitive) {
   const attrs = primitive.attributes || {};
   if (attrs.POSITION == null) throw new Error('primitive missing POSITION');
   const pos = readAccessor(doc, attrs.POSITION);
   const nVert = pos.count;
   const nor = attrs.NORMAL != null
     ? readAccessor(doc, attrs.NORMAL)
-    : { values: new Float32Array(nVert * 3), components: 3 };
+    : { values: new Float32Array(nVert * 3) };
   const uv = attrs.TEXCOORD_0 != null
     ? readAccessor(doc, attrs.TEXCOORD_0)
-    : { values: new Float32Array(nVert * 2), components: 2 };
-  let tan;
+    : { values: new Float32Array(nVert * 2) };
+  let tanValues;
   if (attrs.TANGENT != null) {
-    tan = readAccessor(doc, attrs.TANGENT);
+    tanValues = readAccessor(doc, attrs.TANGENT).values;
   } else {
-    // Placeholder tangents (1,0,0,1) — enough for albedo-only materials.
-    const v = new Float32Array(nVert * 4);
+    tanValues = new Float32Array(nVert * 4);
     for (let i = 0; i < nVert; i++) {
-      v[i * 4] = 1;
-      v[i * 4 + 3] = 1;
+      tanValues[i * 4] = 1;
+      tanValues[i * 4 + 3] = 1;
     }
-    tan = { values: v, components: 4 };
   }
 
-  const stride = 48; // 12+12+8+16
+  const stride = 48;
   const vb = Buffer.alloc(nVert * stride);
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -199,18 +197,17 @@ function buildInterleavedMesh(doc, primitive) {
     vb.writeFloatLE(nor.values[i * 3 + 2] || 0, o + 20);
     vb.writeFloatLE(uv.values[i * 2] || 0, o + 24);
     vb.writeFloatLE(uv.values[i * 2 + 1] || 0, o + 28);
-    vb.writeFloatLE(tan.values[i * 4] || 1, o + 32);
-    vb.writeFloatLE(tan.values[i * 4 + 1] || 0, o + 36);
-    vb.writeFloatLE(tan.values[i * 4 + 2] || 0, o + 40);
-    vb.writeFloatLE(tan.values[i * 4 + 3] || 1, o + 44);
+    vb.writeFloatLE(tanValues[i * 4] || 1, o + 32);
+    vb.writeFloatLE(tanValues[i * 4 + 1] || 0, o + 36);
+    vb.writeFloatLE(tanValues[i * 4 + 2] || 0, o + 40);
+    vb.writeFloatLE(tanValues[i * 4 + 3] || 1, o + 44);
     if (px < minX) minX = px; if (py < minY) minY = py; if (pz < minZ) minZ = pz;
     if (px > maxX) maxX = px; if (py > maxY) maxY = py; if (pz > maxZ) maxZ = pz;
   }
 
   let indices;
-  if (primitive.indices != null) {
-    indices = readIndices(doc, primitive.indices);
-  } else {
+  if (primitive.indices != null) indices = readIndices(doc, primitive.indices);
+  else {
     indices = new Uint32Array(nVert);
     for (let i = 0; i < nVert; i++) indices[i] = i;
   }
@@ -222,8 +219,70 @@ function buildInterleavedMesh(doc, primitive) {
     if (use32) ib.writeUInt32LE(indices[i], i * 4);
     else ib.writeUInt16LE(indices[i], i * 2);
   }
+  return {
+    vb,
+    ib,
+    nVert,
+    indexCount: indices.length,
+    indexStride: use32 ? 4 : 2,
+    materialIndex: primitive.material != null ? primitive.material : 0,
+    min: [minX, minY, minZ],
+    max: [maxX, maxY, maxZ],
+  };
+}
 
-  const bin = Buffer.concat([vb, ib]);
+/** Build one cc.Mesh from a glTF mesh (all primitives). */
+function buildMeshFromGltfMesh(doc, gltfMesh) {
+  const prims = gltfMesh.primitives || [];
+  if (!prims.length) throw new Error('mesh has no primitives');
+
+  const built = prims.map((p) => buildPrimitiveBuffers(doc, p));
+  const vertexBundles = [];
+  const primitives = [];
+  const parts = [];
+  let offset = 0;
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let triangleCount = 0;
+
+  for (let i = 0; i < built.length; i++) {
+    const b = built[i];
+    const vbOffset = offset;
+    parts.push(b.vb);
+    offset += b.vb.length;
+    const ibOffset = offset;
+    parts.push(b.ib);
+    offset += b.ib.length;
+
+    vertexBundles.push({
+      view: { offset: vbOffset, length: b.vb.length, count: b.nVert, stride: 48 },
+      attributes: [
+        { name: 'a_position', format: FMT.RGB32F, isNormalized: false },
+        { name: 'a_normal', format: FMT.RGB32F, isNormalized: false },
+        { name: 'a_texCoord', format: FMT.RG32F, isNormalized: false },
+        { name: 'a_tangent', format: FMT.RGBA32F, isNormalized: false },
+      ],
+    });
+    primitives.push({
+      primitiveMode: PRIM_TRIANGLES,
+      vertexBundelIndices: [i],
+      indexView: {
+        offset: ibOffset,
+        length: b.ib.length,
+        count: b.indexCount,
+        stride: b.indexStride,
+      },
+    });
+    triangleCount += Math.floor(b.indexCount / 3);
+    if (b.min[0] < minX) minX = b.min[0];
+    if (b.min[1] < minY) minY = b.min[1];
+    if (b.min[2] < minZ) minZ = b.min[2];
+    if (b.max[0] > maxX) maxX = b.max[0];
+    if (b.max[1] > maxY) maxY = b.max[1];
+    if (b.max[2] > maxZ) maxZ = b.max[2];
+  }
+
+  const bin = Buffer.concat(parts);
   const meshJson = {
     __type__: 'cc.Mesh',
     _name: '',
@@ -231,42 +290,249 @@ function buildInterleavedMesh(doc, primitive) {
     __editorExtras__: {},
     _native: '.bin',
     _struct: {
-      primitives: [{
-        primitiveMode: PRIM_TRIANGLES,
-        vertexBundelIndices: [0],
-        indexView: {
-          offset: vb.length,
-          length: ib.length,
-          count: indices.length,
-          stride: use32 ? 4 : 2,
-        },
-      }],
-      vertexBundles: [{
-        view: {
-          offset: 0,
-          length: vb.length,
-          count: nVert,
-          stride,
-        },
-        attributes: [
-          { name: 'a_position', format: FMT.RGB32F, isNormalized: false },
-          { name: 'a_normal', format: FMT.RGB32F, isNormalized: false },
-          { name: 'a_texCoord', format: FMT.RG32F, isNormalized: false },
-          { name: 'a_tangent', format: FMT.RGBA32F, isNormalized: false },
-        ],
-      }],
+      primitives,
+      vertexBundles,
       minPosition: { __type__: 'cc.Vec3', x: minX, y: minY, z: minZ },
       maxPosition: { __type__: 'cc.Vec3', x: maxX, y: maxY, z: maxZ },
     },
     _hash: djb2(bin),
     _allowDataAccess: true,
   };
+  // Material slots follow primitive order (Creator assigns one material per prim).
+  const materialIndices = built.map((b) => b.materialIndex);
+  return { bin, meshJson, materialIndices, triangleCount };
+}
+
+function quatFromGltf(node) {
+  if (node.rotation && node.rotation.length === 4) {
+    const [x, y, z, w] = node.rotation;
+    return { __type__: 'cc.Quat', x, y, z, w };
+  }
+  return { __type__: 'cc.Quat', x: 0, y: 0, z: 0, w: 1 };
+}
+
+function vec3From(arr, fallback) {
+  if (arr && arr.length >= 3) {
+    return { __type__: 'cc.Vec3', x: arr[0], y: arr[1], z: arr[2] };
+  }
+  return { __type__: 'cc.Vec3', x: fallback[0], y: fallback[1], z: fallback[2] };
+}
+
+/** Resolve glTF node local TRS, including mat4 bake when present. */
+function nodeLocalTRS(node) {
+  if (node.matrix && node.matrix.length === 16) {
+    const m = node.matrix;
+    const t = { __type__: 'cc.Vec3', x: m[12], y: m[13], z: m[14] };
+    const sx = Math.hypot(m[0], m[1], m[2]) || 1;
+    const sy = Math.hypot(m[4], m[5], m[6]) || 1;
+    const sz = Math.hypot(m[8], m[9], m[10]) || 1;
+    const r00 = m[0] / sx, r10 = m[1] / sx, r20 = m[2] / sx;
+    const r01 = m[4] / sy, r11 = m[5] / sy, r21 = m[6] / sy;
+    const r02 = m[8] / sz, r12 = m[9] / sz, r22 = m[10] / sz;
+    const trace = r00 + r11 + r22;
+    let qx, qy, qz, qw;
+    if (trace > 0) {
+      const s = Math.sqrt(trace + 1) * 2;
+      qw = 0.25 * s; qx = (r21 - r12) / s; qy = (r02 - r20) / s; qz = (r10 - r01) / s;
+    } else if (r00 > r11 && r00 > r22) {
+      const s = Math.sqrt(1 + r00 - r11 - r22) * 2;
+      qw = (r21 - r12) / s; qx = 0.25 * s; qy = (r01 + r10) / s; qz = (r02 + r20) / s;
+    } else if (r11 > r22) {
+      const s = Math.sqrt(1 + r11 - r00 - r22) * 2;
+      qw = (r02 - r20) / s; qx = (r01 + r10) / s; qy = 0.25 * s; qz = (r12 + r21) / s;
+    } else {
+      const s = Math.sqrt(1 + r22 - r00 - r11) * 2;
+      qw = (r10 - r01) / s; qx = (r02 + r20) / s; qy = (r12 + r21) / s; qz = 0.25 * s;
+    }
+    return {
+      pos: t,
+      rot: { __type__: 'cc.Quat', x: qx, y: qy, z: qz, w: qw },
+      scale: { __type__: 'cc.Vec3', x: sx, y: sy, z: sz },
+    };
+  }
   return {
-    bin,
-    meshJson,
-    materialIndex: primitive.material != null ? primitive.material : 0,
-    triangleCount: Math.floor(indices.length / 3),
+    pos: vec3From(node.translation, [0, 0, 0]),
+    rot: quatFromGltf(node),
+    scale: vec3From(node.scale, [1, 1, 1]),
   };
+}
+
+function makeMeshRenderer(nodeId, meshUuid, materialUuids, bakeId, compPrefabId) {
+  return {
+    __type__: 'cc.MeshRenderer',
+    _name: '',
+    _objFlags: 0,
+    __editorExtras__: {},
+    node: { __id__: nodeId },
+    _enabled: true,
+    __prefab: { __id__: compPrefabId },
+    _materials: (materialUuids || []).filter(Boolean).map((u) => ({
+      __uuid__: u,
+      __expectedType__: 'cc.Material',
+    })),
+    _visFlags: 0,
+    bakeSettings: { __id__: bakeId },
+    _mesh: { __uuid__: meshUuid, __expectedType__: 'cc.Mesh' },
+    _shadowCastingMode: 0,
+    _shadowReceivingMode: 1,
+    _shadowBias: 0,
+    _shadowNormalBias: 0,
+    _reflectionProbeId: -1,
+    _reflectionProbeBlendId: -1,
+    _reflectionProbeBlendWeight: 0,
+    _enabledGlobalStandardSkinObject: false,
+    _enableMorph: true,
+    _id: '',
+  };
+}
+
+function makeBakeSettings() {
+  return {
+    __type__: 'cc.ModelBakeSettings',
+    texture: null,
+    uvParam: { __type__: 'cc.Vec4', x: 0, y: 0, z: 0, w: 0 },
+    _bakeable: false,
+    _castShadow: false,
+    _receiveShadow: false,
+    _recieveShadow: false,
+    _lightmapSize: 64,
+    _useLightProbe: false,
+    _bakeToLightProbe: true,
+    _reflectionProbeType: 0,
+    _bakeToReflectionProbe: true,
+  };
+}
+
+/**
+ * Build a Creator-style gltf-scene prefab:
+ *   Prefab → outer wrapper node → glTF scene root(s) with full TRS hierarchy
+ *   and MeshRenderer on every node that references a mesh.
+ */
+function buildHierarchyPrefab(doc, meshIds, materialIds, meshMaterialSlots, seed, fallbackName) {
+  const nodes = doc.json.nodes || [];
+  const scenes = doc.json.scenes || [];
+  const scene = scenes[doc.json.scene || 0] || scenes[0] || { nodes: nodes.length ? [0] : [], name: fallbackName };
+  const sceneName = scene.name || fallbackName || 'Root';
+  const rootIndices = scene.nodes && scene.nodes.length ? scene.nodes : (nodes.length ? [0] : []);
+
+  const out = [];
+  out.push({
+    __type__: 'cc.Prefab',
+    _name: '',
+    _objFlags: 0,
+    __editorExtras__: {},
+    _native: '',
+    data: { __id__: 1 },
+    optimizationPolicy: 0,
+    persistent: false,
+  });
+
+  // Map glTF node index → object id in `out` (filled as we emit).
+  const nodeObjId = new Map();
+  // Pending child link patches: { parentObjId, childGltfIndex }
+  const childLinks = [];
+
+  function emitNode(gltfIndex, parentObjId) {
+    const n = nodes[gltfIndex] || { name: `node_${gltfIndex}` };
+    const objId = out.length;
+    nodeObjId.set(gltfIndex, objId);
+
+    const children = n.children || [];
+    const childRefs = children.map((ci) => {
+      childLinks.push({ parentObjId: objId, childGltfIndex: ci });
+      return { __id__: -1 }; // patched later
+    });
+
+    const trs = nodeLocalTRS(n);
+    const hasMesh = n.mesh != null && meshIds[n.mesh];
+    const comps = [];
+    out.push({
+      __type__: 'cc.Node',
+      _name: n.name || `node_${gltfIndex}`,
+      _objFlags: 0,
+      __editorExtras__: {},
+      _parent: parentObjId == null ? null : { __id__: parentObjId },
+      _children: childRefs,
+      _active: true,
+      _components: comps,
+      _prefab: null, // filled later
+      _lpos: trs.pos,
+      _lrot: trs.rot,
+      _lscale: trs.scale,
+      _mobility: 0,
+      _layer: 1073741824,
+      _euler: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
+      _id: '',
+    });
+
+    if (hasMesh) {
+      const meshUuid = meshIds[n.mesh];
+      const slots = meshMaterialSlots[n.mesh] || [0];
+      const mats = slots.map((mi) => materialIds[mi] || materialIds[0] || null);
+      const mrId = out.length;
+      const bakeId = mrId + 1;
+      const compInfoId = mrId + 2;
+      comps.push({ __id__: mrId });
+      out.push(makeMeshRenderer(objId, meshUuid, mats, bakeId, compInfoId));
+      out.push(makeBakeSettings());
+      out.push({ __type__: 'cc.CompPrefabInfo', fileId: fileIdFrom(`${seed}:mr:${gltfIndex}`) });
+    }
+
+    for (const ci of children) emitNode(ci, objId);
+  }
+
+  // Outer wrapper (Creator always adds one)
+  const wrapperId = out.length; // 1
+  const sceneRootRefs = rootIndices.map(() => ({ __id__: -1 }));
+  out.push({
+    __type__: 'cc.Node',
+    _name: sceneName,
+    _objFlags: 0,
+    __editorExtras__: {},
+    _parent: null,
+    _children: sceneRootRefs,
+    _active: true,
+    _components: [],
+    _prefab: null,
+    _lpos: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
+    _lrot: { __type__: 'cc.Quat', x: 0, y: 0, z: 0, w: 1 },
+    _lscale: { __type__: 'cc.Vec3', x: 1, y: 1, z: 1 },
+    _mobility: 0,
+    _layer: 1073741824,
+    _euler: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
+    _id: '',
+  });
+
+  rootIndices.forEach((ri, i) => {
+    emitNode(ri, wrapperId);
+    sceneRootRefs[i].__id__ = nodeObjId.get(ri);
+  });
+
+  // Patch child __id__ placeholders
+  for (const link of childLinks) {
+    const parent = out[link.parentObjId];
+    const childId = nodeObjId.get(link.childGltfIndex);
+    const slot = parent._children.find((c) => c.__id__ === -1);
+    if (slot) slot.__id__ = childId;
+  }
+
+  // PrefabInfo for every node
+  for (let i = 1; i < out.length; i++) {
+    if (out[i].__type__ !== 'cc.Node') continue;
+    const infoId = out.length;
+    out[i]._prefab = { __id__: infoId };
+    out.push({
+      __type__: 'cc.PrefabInfo',
+      root: { __id__: 1 },
+      asset: { __id__: 0 },
+      fileId: fileIdFrom(`${seed}:node:${i}`),
+      instance: null,
+      targetOverrides: null,
+      nestedPrefabInstanceRoots: null,
+    });
+  }
+
+  return out;
 }
 
 function ensureImageAsset(imagePath, libraryRoot, changed) {
@@ -362,119 +628,6 @@ function textureJson(imageUuid, wrapS, wrapT) {
       mipmaps: [imageUuid],
     },
   };
-}
-
-function prefabJson(rootName, meshUuid, materialUuid, seed) {
-  return [
-    {
-      __type__: 'cc.Prefab',
-      _name: '',
-      _objFlags: 0,
-      __editorExtras__: {},
-      _native: '',
-      data: { __id__: 1 },
-      optimizationPolicy: 0,
-      persistent: false,
-    },
-    {
-      __type__: 'cc.Node',
-      _name: rootName,
-      _objFlags: 0,
-      __editorExtras__: {},
-      _parent: null,
-      _children: [{ __id__: 2 }],
-      _active: true,
-      _components: [],
-      _prefab: { __id__: 7 },
-      _lpos: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
-      _lrot: { __type__: 'cc.Quat', x: 0, y: 0, z: 0, w: 1 },
-      _lscale: { __type__: 'cc.Vec3', x: 1, y: 1, z: 1 },
-      _mobility: 0,
-      _layer: 1073741824,
-      _euler: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
-      _id: '',
-    },
-    {
-      __type__: 'cc.Node',
-      _name: rootName,
-      _objFlags: 0,
-      __editorExtras__: {},
-      _parent: { __id__: 1 },
-      _children: [],
-      _active: true,
-      _components: [{ __id__: 3 }],
-      _prefab: { __id__: 6 },
-      _lpos: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
-      _lrot: { __type__: 'cc.Quat', x: 0, y: 0, z: 0, w: 1 },
-      _lscale: { __type__: 'cc.Vec3', x: 1, y: 1, z: 1 },
-      _mobility: 0,
-      _layer: 1073741824,
-      _euler: { __type__: 'cc.Vec3', x: 0, y: 0, z: 0 },
-      _id: '',
-    },
-    {
-      __type__: 'cc.MeshRenderer',
-      _name: '',
-      _objFlags: 0,
-      __editorExtras__: {},
-      node: { __id__: 2 },
-      _enabled: true,
-      __prefab: { __id__: 4 },
-      _materials: materialUuid ? [{
-        __uuid__: materialUuid,
-        __expectedType__: 'cc.Material',
-      }] : [],
-      _visFlags: 0,
-      bakeSettings: { __id__: 5 },
-      _mesh: {
-        __uuid__: meshUuid,
-        __expectedType__: 'cc.Mesh',
-      },
-      _shadowCastingMode: 0,
-      _shadowReceivingMode: 1,
-      _shadowBias: 0,
-      _shadowNormalBias: 0,
-      _reflectionProbeId: -1,
-      _reflectionProbeBlendId: -1,
-      _reflectionProbeBlendWeight: 0,
-      _enabledGlobalStandardSkinObject: false,
-      _enableMorph: true,
-      _id: '',
-    },
-    { __type__: 'cc.CompPrefabInfo', fileId: fileIdFrom(`${seed}:comp`) },
-    {
-      __type__: 'cc.ModelBakeSettings',
-      texture: null,
-      uvParam: { __type__: 'cc.Vec4', x: 0, y: 0, z: 0, w: 0 },
-      _bakeable: false,
-      _castShadow: false,
-      _receiveShadow: false,
-      _recieveShadow: false,
-      _lightmapSize: 64,
-      _useLightProbe: false,
-      _bakeToLightProbe: true,
-      _reflectionProbeType: 0,
-      _bakeToReflectionProbe: true,
-    },
-    {
-      __type__: 'cc.PrefabInfo',
-      root: { __id__: 1 },
-      asset: { __id__: 0 },
-      fileId: fileIdFrom(`${seed}:child`),
-      instance: null,
-      targetOverrides: null,
-      nestedPrefabInstanceRoots: null,
-    },
-    {
-      __type__: 'cc.PrefabInfo',
-      root: { __id__: 1 },
-      asset: { __id__: 0 },
-      fileId: fileIdFrom(`${seed}:root`),
-      instance: null,
-      targetOverrides: null,
-      nestedPrefabInstanceRoots: null,
-    },
-  ];
 }
 
 function findExistingSubId(meta, importer, gltfIndex, nameHint) {
@@ -615,13 +768,16 @@ function importGltf(assetPath, libraryRoot) {
     materialIds.push(subUuid);
   }
 
-  // --- meshes (first primitive of each mesh for MVP) ---
-  const meshMatPairs = [];
+  // --- meshes (all primitives per mesh) ---
+  const meshMaterialSlots = []; // meshIndex → [materialIndex per prim]
   for (let i = 0; i < meshes.length; i++) {
     const mesh = meshes[i];
-    const prim = (mesh.primitives || [])[0];
-    if (!prim) continue;
-    const built = buildInterleavedMesh(doc, prim);
+    if (!(mesh.primitives || []).length) {
+      meshIds.push(null);
+      meshMaterialSlots.push([]);
+      continue;
+    }
+    const built = buildMeshFromGltfMesh(doc, mesh);
     const name = `${mesh.name || baseName}.mesh`;
     let id = findExistingSubId(meta, 'gltf-mesh', i, name) || shortId('mesh', i, name);
     const subUuid = `${uuid}@${id}`;
@@ -640,16 +796,11 @@ function importGltf(assetPath, libraryRoot) {
     if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), built.meshJson)) changed.push(`${subUuid}.json`);
     if (writeBytesIfChanged(path.join(dir, `${subUuid}.bin`), built.bin)) changed.push(`${subUuid}.bin`);
     meshIds.push(subUuid);
-    meshMatPairs.push({
-      meshUuid: subUuid,
-      materialUuid: materialIds[built.materialIndex] || materialIds[0] || null,
-      name: mesh.name || baseName,
-    });
+    meshMaterialSlots.push(built.materialIndices);
   }
 
-  // --- scene prefab (scene 0 / first mesh) ---
-  const pair = meshMatPairs[0];
-  if (pair) {
+  // --- scene prefab (full glTF node hierarchy) ---
+  if (meshIds.some(Boolean) || (doc.json.nodes || []).length) {
     const name = `${baseName}.prefab`;
     let id = findExistingSubId(meta, 'gltf-scene', 0, name) || shortId('scene', 0, name);
     const subUuid = `${uuid}@${id}`;
@@ -665,13 +816,20 @@ function importGltf(assetPath, libraryRoot) {
       files: ['.json'],
       subMetas: {},
     };
-    const prefab = prefabJson(pair.name, pair.meshUuid, pair.materialUuid, subUuid);
+    const prefab = buildHierarchyPrefab(
+      doc,
+      meshIds,
+      materialIds,
+      meshMaterialSlots,
+      subUuid,
+      baseName,
+    );
     if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), prefab)) changed.push(`${subUuid}.json`);
     sceneIds.push(subUuid);
   }
 
   meta.userData.assetFinder = {
-    meshes: meshIds,
+    meshes: meshIds.filter(Boolean),
     skeletons: [],
     textures: textureIds,
     materials: materialIds,
