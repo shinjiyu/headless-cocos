@@ -4,10 +4,9 @@
 /**
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
- * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT] [/ JOINTS+WEIGHTS]),
- * material + albedo, full node hierarchy prefab, ExoticAnimation clips, and
- * skins (`gltf-skeleton` + SkinnedMeshRenderer / SkeletalAnimation).
- * No morphs / lights.
+ * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TANGENT] [/ JOINTS+WEIGHTS]
+ * [/ morph POSITION+NORMAL+TANGENT]), material + albedo, full node hierarchy,
+ * ExoticAnimation clips, morph-weight RealArrayTracks, and skins. No lights / cameras.
  */
 
 const crypto = require('crypto');
@@ -311,6 +310,68 @@ function buildMeshFromGltfMesh(doc, gltfMesh, skin) {
     if (b.max[2] > maxZ) maxZ = b.max[2];
   }
 
+  // Morph targets: append Float32 VEC3 displacement views after VB/IB.
+  const ATTR_MAP = {
+    POSITION: 'a_position',
+    NORMAL: 'a_normal',
+    TANGENT: 'a_tangent',
+  };
+  const subMeshMorphs = [];
+  let anyMorph = false;
+  for (let pi = 0; pi < prims.length; pi++) {
+    const targets = prims[pi].targets || [];
+    if (!targets.length) {
+      subMeshMorphs.push(null);
+      continue;
+    }
+    const nVert = built[pi].nVert;
+    // Prefer POSITION; include NORMAL/TANGENT when present on all targets.
+    const attrKeys = ['POSITION'];
+    if (targets.every((t) => t.NORMAL != null)) attrKeys.push('NORMAL');
+    if (targets.every((t) => t.TANGENT != null)) attrKeys.push('TANGENT');
+    // Skip morph if no POSITION on any target
+    if (!targets.some((t) => t.POSITION != null)) {
+      subMeshMorphs.push(null);
+      continue;
+    }
+    const morphTargets = [];
+    for (const t of targets) {
+      const displacements = [];
+      for (const key of attrKeys) {
+        const accIndex = t[key];
+        let floats;
+        if (accIndex == null) {
+          floats = new Float32Array(nVert * 3);
+        } else {
+          const acc = readAccessor(doc, accIndex);
+          // TANGENT morph in glTF is VEC3 deltas (not VEC4)
+          const need = nVert * 3;
+          floats = new Float32Array(need);
+          const src = acc.values;
+          const copy = Math.min(src.length, need);
+          floats.set(src.subarray(0, copy));
+        }
+        const viewOffset = offset;
+        const bytes = Buffer.from(floats.buffer, floats.byteOffset, floats.byteLength);
+        parts.push(bytes);
+        offset += bytes.length;
+        displacements.push({
+          offset: viewOffset,
+          length: bytes.length,
+          count: floats.length,
+          stride: 12,
+        });
+      }
+      morphTargets.push({ displacements });
+    }
+    subMeshMorphs.push({
+      attributes: attrKeys.map((k) => ATTR_MAP[k]),
+      targets: morphTargets,
+      weights: Array.isArray(gltfMesh.weights) ? gltfMesh.weights.slice() : undefined,
+    });
+    anyMorph = true;
+  }
+
   const bin = Buffer.concat(parts);
   const meshStruct = {
     primitives,
@@ -325,6 +386,15 @@ function buildMeshFromGltfMesh(doc, gltfMesh, skin) {
     }
     meshStruct.jointMaps = [Array.from({ length: nJoints }, (_, i) => i)];
   }
+  if (anyMorph) {
+    const morph = { subMeshMorphs };
+    if (Array.isArray(gltfMesh.weights) && gltfMesh.weights.length) {
+      morph.weights = gltfMesh.weights.slice();
+    }
+    const names = gltfMesh.extras && gltfMesh.extras.targetNames;
+    if (Array.isArray(names) && names.length) morph.targetNames = names.slice();
+    meshStruct.morph = morph;
+  }
   const meshJson = {
     __type__: 'cc.Mesh',
     _name: '',
@@ -336,7 +406,14 @@ function buildMeshFromGltfMesh(doc, gltfMesh, skin) {
     _allowDataAccess: true,
   };
   const materialIndices = built.map((b) => b.materialIndex);
-  return { bin, meshJson, materialIndices, triangleCount, skinned: anySkinned };
+  return {
+    bin,
+    meshJson,
+    materialIndices,
+    triangleCount,
+    skinned: anySkinned,
+    morph: anyMorph,
+  };
 }
 
 function quatFromGltf(node) {
@@ -552,15 +629,21 @@ function buildAnimationClipCcon(doc, animIndex, sample) {
 
   const channelsByNode = new Map();
   let duration = 0;
+  const weightChannels = []; // { node, times, values, targetCount }
   for (const ch of anim.channels || []) {
     if (ch.target == null || ch.target.node == null) continue;
     const pathName = ch.target.path;
-    if (pathName !== 'translation' && pathName !== 'rotation' && pathName !== 'scale') continue;
     const sampler = (anim.samplers || [])[ch.sampler];
     if (!sampler) continue;
     const times = readAccessor(doc, sampler.input).values;
     const values = readAccessor(doc, sampler.output).values;
     if (times.length) duration = Math.max(duration, times[times.length - 1]);
+
+    if (pathName === 'weights') {
+      weightChannels.push({ node: ch.target.node, times, values });
+      continue;
+    }
+    if (pathName !== 'translation' && pathName !== 'rotation' && pathName !== 'scale') continue;
     let slot = channelsByNode.get(ch.target.node);
     if (!slot) {
       slot = {};
@@ -669,6 +752,84 @@ function buildAnimationClipCcon(doc, animIndex, sample) {
     refClip: null,
   });
 
+  // Morph weight tracks (RealArrayTrack + MorphWeightsAllValueProxy)
+  const trackRefs = [];
+  for (const wc of weightChannels) {
+    const node = doc.json.nodes[wc.node];
+    if (!node || node.mesh == null) continue;
+    const mesh = doc.json.meshes[node.mesh];
+    const nTargets = ((mesh.primitives || [])[0] && (mesh.primitives[0].targets || []).length) || 0;
+    if (!nTargets) continue;
+    const nFrames = wc.times.length;
+    const pathStr = gltfNodePath(doc, wc.node);
+    const compName = node.skin != null ? 'cc.SkinnedMeshRenderer' : 'cc.MeshRenderer';
+
+    const channelIds = [];
+    for (let ti = 0; ti < nTargets; ti++) {
+      const curveId = document.length;
+      const times = [];
+      const values = [];
+      for (let f = 0; f < nFrames; f++) {
+        times.push(wc.times[f]);
+        values.push({
+          __type__: 'cc.RealKeyframeValue',
+          interpolationMode: 0,
+          tangentWeightMode: 0,
+          value: wc.values[f * nTargets + ti] || 0,
+          rightTangent: 0,
+          rightTangentWeight: 1,
+          leftTangent: 0,
+          leftTangentWeight: 1,
+          easingMethod: 0,
+        });
+      }
+      document.push({
+        __type__: 'cc.RealCurve',
+        _times: times,
+        _values: values,
+        preExtrapolation: 1,
+        postExtrapolation: 1,
+      });
+      const chId = document.length;
+      document.push({
+        __type__: 'cc.animation.Channel',
+        _curve: { __id__: curveId },
+      });
+      channelIds.push(chId);
+    }
+
+    const hierId = document.length;
+    document.push({
+      __type__: 'cc.animation.HierarchyPath',
+      path: pathStr,
+    });
+    const compId = document.length;
+    document.push({
+      __type__: 'cc.animation.ComponentPath',
+      component: compName,
+    });
+    const pathId = document.length;
+    document.push({
+      __type__: 'cc.animation.TrackPath',
+      _paths: [{ __id__: hierId }, { __id__: compId }],
+    });
+    const proxyId = document.length;
+    document.push({
+      __type__: 'cc.animation.MorphWeightsAllValueProxy',
+    });
+    const trackId = document.length;
+    document.push({
+      __type__: 'cc.animation.RealArrayTrack',
+      _binding: {
+        __type__: 'cc.animation.TrackBinding',
+        path: { __id__: pathId },
+        proxy: { __id__: proxyId },
+      },
+      _channels: channelIds.map((id) => ({ __id__: id })),
+    });
+    trackRefs.push({ __id__: trackId });
+  }
+
   document[0] = {
     __type__: 'cc.AnimationClip',
     _name: anim.name || `animation_${animIndex}`,
@@ -681,7 +842,7 @@ function buildAnimationClipCcon(doc, animIndex, sample) {
     enableTrsBlending: true,
     _duration: duration,
     _hash: 0,
-    _tracks: [],
+    _tracks: trackRefs,
     _exoticAnimation: { __id__: exoticId },
     _events: [],
     _embeddedPlayers: [],

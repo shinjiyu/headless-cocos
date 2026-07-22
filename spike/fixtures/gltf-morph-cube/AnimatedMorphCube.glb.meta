@@ -1,0 +1,11 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": false,
+  "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "note": "Khronos AnimatedMorphCube — morph fixture for headless importer"
+  }
+}

@@ -6,11 +6,12 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 
 | Supported | Not yet |
 |-----------|---------|
-| `.gltf` + external `.bin` / images | Morph targets |
-| `.glb` (JSON + BIN chunks) | Cameras / lights |
+| `.gltf` + external `.bin` / images | Cameras / lights |
+| `.glb` (JSON + BIN chunks) | |
 | `.fbx` via Creator `FBX2glTF` → glTF | |
 | POSITION / NORMAL / TEXCOORD_0 / TANGENT | |
 | **JOINTS_0 / WEIGHTS_0** + `gltf-skeleton` | |
+| **Morph targets** (POSITION [/ NORMAL / TANGENT]) + weight tracks | |
 | **All meshes + all primitives** | |
 | **Full node hierarchy + TRS** → prefab | |
 | **Animations** → ExoticAnimation CCON (`.bin`) | |
@@ -23,7 +24,7 @@ Root meta: `importer: "gltf"` (or `"fbx"`), `files: []`.
 
 | Sub | Importer | Files |
 |-----|----------|-------|
-| mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive OK; skinned stride 72) |
+| mesh (per glTF mesh) | `gltf-mesh` | `.json` + `.bin` (multi-primitive; skinned stride 72; morph deltas) |
 | texture | `texture` | `.json` |
 | material | `gltf-material` | `.json` (builtin standard) |
 | skeleton (per skin) | `gltf-skeleton` | `.json` (`_joints` paths + `_bindposes`) |
@@ -42,11 +43,11 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 
 ## Code
 
-- `spike/importers/gltf.cjs` — hierarchy + multi-prim + animations + skins
+- `spike/importers/gltf.cjs` — hierarchy + multi-prim + animations + skins + morphs
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-fbx.cjs`
 
 ## Verify
 
@@ -56,6 +57,7 @@ node .\spike\e2e-gltf-hierarchy.cjs
 node .\spike\e2e-gltf-anim.cjs --disk-only
 node .\spike\e2e-gltf-skin.cjs
 node .\spike\e2e-gltf-skin.cjs --fbx
+node .\spike\e2e-gltf-morph.cjs
 node .\spike\e2e-fbx.cjs
 ```
 
@@ -69,3 +71,8 @@ Skinned ground truth (Creator `soldier.FBX` / perlab):
 
 - 4 skeletons (`@30732` …), 4 skinned meshes (stride 72)
 - Prefab: 4 `SkinnedMeshRenderer` + `SkeletalAnimation`
+
+Morph ground truth (`spike/fixtures/gltf-morph-cube/AnimatedMorphCube.glb`):
+
+- 2 morph targets with POSITION/NORMAL/TANGENT displacements
+- Weight animation → `RealArrayTrack` + `MorphWeightsAllValueProxy`
