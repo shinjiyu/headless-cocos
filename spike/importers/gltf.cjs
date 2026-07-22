@@ -1181,14 +1181,28 @@ function materialJson(mat, textureIds) {
     );
   }
 
-  // doubleSided → disable back-face cull (CullMode.NONE = 0 in GFX? BACK=1, FRONT=2, NONE=0)
-  // Creator: CullMode.NONE = 0, BACK = 1, FRONT = 2
+  // doubleSided → CullMode.NONE (0); else BACK (1)
   const cullMode = mat.doubleSided ? 0 : 1;
+  if (mat.doubleSided) defines[0].USE_TWOSIDE = true;
 
-  // Alpha mode
+  // Alpha: MASK → alpha test; BLEND → transparent technique (_techIdx 1)
+  let techIdx = 0;
+  let blendState = { targets: [{}] };
+  let depthStencilState = {};
   if (mat.alphaMode === 'MASK') {
     defines[0].USE_ALPHA_TEST = true;
     props.alphaThreshold = mat.alphaCutoff != null ? mat.alphaCutoff : 0.5;
+  } else if (mat.alphaMode === 'BLEND') {
+    techIdx = 1;
+    depthStencilState = { depthTest: true, depthWrite: false };
+    blendState = {
+      targets: [{
+        blend: true,
+        blendSrc: 2, // SRC_ALPHA
+        blendDst: 4, // ONE_MINUS_SRC_ALPHA
+        blendDstAlpha: 4,
+      }],
+    };
   }
 
   return {
@@ -1201,12 +1215,12 @@ function materialJson(mat, textureIds) {
       __uuid__: STANDARD_EFFECT,
       __expectedType__: 'cc.EffectAsset',
     },
-    _techIdx: 0,
+    _techIdx: techIdx,
     _defines: defines,
     _states: [{
       rasterizerState: { cullMode },
-      blendState: { targets: [{}] },
-      depthStencilState: {},
+      blendState,
+      depthStencilState,
     }],
     _props: [props],
   };

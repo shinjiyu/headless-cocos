@@ -26,6 +26,7 @@ import plistImporter from './importers/plist.cjs';
 import textImporter from './importers/text.cjs';
 import gltfImporter from './importers/gltf.cjs';
 import fbxImporter from './importers/fbx.cjs';
+import polyhavenImporter from './importers/polyhaven.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
@@ -82,6 +83,7 @@ const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
 const { GLTF_EXTS, importGltf } = gltfImporter;
 const { FBX_EXTS, importFbx } = fbxImporter;
+const { fetchModel, listModels } = polyhavenImporter;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -1337,6 +1339,83 @@ const server = http.createServer(async (req, res) => {
       'hmr'
     );
     return;
+  }
+
+  // Poly Haven: GET/POST /__polyhaven?id=wooden_table_02&res=1k
+  //             GET /__polyhaven/list?maxPoly=1000&limit=20
+  {
+    const u = new URL(urlPath, 'http://127.0.0.1');
+    if (u.pathname === '/__polyhaven/list') {
+      try {
+        const rows = await listModels({
+          maxPoly: u.searchParams.get('maxPoly')
+            ? Number(u.searchParams.get('maxPoly'))
+            : undefined,
+          limit: u.searchParams.get('limit')
+            ? Number(u.searchParams.get('limit'))
+            : 20,
+        });
+        send(res, 200, JSON.stringify({ ok: true, models: rows }), 'application/json; charset=utf-8', 'polyhaven');
+      } catch (err) {
+        send(res, 502, JSON.stringify({ ok: false, error: String(err.message || err) }), 'application/json; charset=utf-8', 'polyhaven');
+      }
+      return;
+    }
+    if (u.pathname === '/__polyhaven') {
+      const id = u.searchParams.get('id');
+      if (!id) {
+        send(
+          res,
+          400,
+          JSON.stringify({ ok: false, error: 'missing ?id=', usage: '/__polyhaven?id=wooden_table_02&res=1k' }),
+          'application/json; charset=utf-8',
+          'polyhaven',
+        );
+        return;
+      }
+      if (req.method !== 'GET' && req.method !== 'POST') {
+        send(res, 405, JSON.stringify({ ok: false, error: 'GET or POST' }), 'application/json; charset=utf-8', 'polyhaven');
+        return;
+      }
+      try {
+        const resolution = u.searchParams.get('res') || '1k';
+        const destDir = path.join(ASSETS, 'polyhaven', id);
+        console.log('[polyhaven] fetch', id, `@${resolution}`, '→', destDir);
+        const pkg = await fetchModel(id, destDir, { resolution });
+        const r = importGltf(pkg.entryGltf, LIBRARY);
+        if (!r) throw new Error('importGltf returned null');
+        console.log(
+          '[polyhaven] imported',
+          id,
+          `meshes=${r.meshes.filter(Boolean).length}`,
+          `mats=${r.materials.length}`,
+          `→ ${r.uuid}`,
+        );
+        if (typeof broadcastReload === 'function') broadcastReload(`polyhaven:${id}`);
+        send(
+          res,
+          200,
+          JSON.stringify({
+            ok: true,
+            assetId: id,
+            resolution,
+            entryGltf: path.relative(PROJECT, pkg.entryGltf).replace(/\\/g, '/'),
+            uuid: r.uuid,
+            meshes: r.meshes.filter(Boolean),
+            materials: r.materials,
+            textures: r.textures,
+            scenes: r.scenes,
+            source: `https://polyhaven.com/a/${encodeURIComponent(id)}`,
+          }),
+          'application/json; charset=utf-8',
+          'polyhaven',
+        );
+      } catch (err) {
+        console.warn('[polyhaven] failed', id, err.message);
+        send(res, 502, JSON.stringify({ ok: false, error: String(err.message || err) }), 'application/json; charset=utf-8', 'polyhaven');
+      }
+      return;
+    }
   }
 
   const qe = urlPath.match(/^\/query-extname\/([0-9a-fA-F-]{36}(?:@[0-9a-fA-F]+)*)\/?$/);

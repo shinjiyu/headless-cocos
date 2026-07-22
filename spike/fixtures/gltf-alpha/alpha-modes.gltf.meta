@@ -1,0 +1,111 @@
+{
+  "uuid": "0655f4e8-627e-49a7-b858-33be4249040e",
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "files": [],
+  "subMetas": {
+    "3376e": {
+      "importer": "gltf-material",
+      "uuid": "0655f4e8-627e-49a7-b858-33be4249040e@3376e",
+      "displayName": "",
+      "id": "3376e",
+      "name": "blend_glass.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "b9351": {
+      "importer": "gltf-material",
+      "uuid": "0655f4e8-627e-49a7-b858-33be4249040e@b9351",
+      "displayName": "",
+      "id": "b9351",
+      "name": "mask_cutout.material",
+      "userData": {
+        "gltfIndex": 1
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "b97c3": {
+      "importer": "gltf-mesh",
+      "uuid": "0655f4e8-627e-49a7-b858-33be4249040e@b97c3",
+      "displayName": "",
+      "id": "b97c3",
+      "name": "AlphaCube.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 2
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "d3fbb": {
+      "importer": "gltf-scene",
+      "uuid": "0655f4e8-627e-49a7-b858-33be4249040e@d3fbb",
+      "displayName": "",
+      "id": "d3fbb",
+      "name": "alpha-modes.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "assetFinder": {
+      "meshes": [
+        "0655f4e8-627e-49a7-b858-33be4249040e@b97c3"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "0655f4e8-627e-49a7-b858-33be4249040e@3376e",
+        "0655f4e8-627e-49a7-b858-33be4249040e@b9351"
+      ],
+      "scenes": [
+        "0655f4e8-627e-49a7-b858-33be4249040e@d3fbb"
+      ]
+    },
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "imageFindOrder": []
+  }
+}

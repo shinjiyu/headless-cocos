@@ -41,6 +41,19 @@ const result = importGltf(pkg.entryGltf, libraryRoot);
 Cache dir: `%TEMP%/headless-cocos-polyhaven/{id}/{resolution}/` (override with
 `cacheDir` option).
 
+## Mirror HTTP API
+
+With `preview-mirror` running (`PACKER=mini`):
+
+```text
+GET  /__polyhaven/list?maxPoly=1000&limit=20
+GET  /__polyhaven?id=wooden_table_02&res=1k
+POST /__polyhaven?id=wooden_table_02&res=1k
+```
+
+Fetches into `assets/polyhaven/{id}/`, runs `importGltf`, then broadcasts HMR reload.
+JSON response includes `uuid`, mesh/material sub-ids, and the Poly Haven source URL.
+
 ## assetsSrcAPI
 
 For full pool / ADL / CocosTargetAdapter workflows use the sibling repo:
