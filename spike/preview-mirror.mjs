@@ -24,6 +24,7 @@ import bmfontImporter from './importers/bmfont.cjs';
 import spineImporter from './importers/spine.cjs';
 import plistImporter from './importers/plist.cjs';
 import textImporter from './importers/text.cjs';
+import gltfImporter from './importers/gltf.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
@@ -78,6 +79,7 @@ const { BMFONT_EXTS, importBMFont } = bmfontImporter;
 const { importSpine, importSpineBinary, isSpineJson } = spineImporter;
 const { PLIST_EXTS, importPlist, parsePlist, classifyPlist } = plistImporter;
 const { TEXT_EXTS, importText } = textImporter;
+const { GLTF_EXTS, importGltf } = gltfImporter;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -1012,6 +1014,24 @@ function importPlistLogged(absPath, label) {
     return null;
   }
 }
+function importGltfLogged(absPath, label) {
+  try {
+    const r = importGltf(absPath, LIBRARY);
+    if (r && r.changed.length) {
+      console.log(
+        '[gltf-import]',
+        label,
+        `meshes=${r.meshes.length}`,
+        `mats=${r.materials.length}`,
+        `→ ${r.uuid}`,
+      );
+    }
+    return r;
+  } catch (err) {
+    console.warn('[gltf-import] failed', label, err.message);
+    return null;
+  }
+}
 function syncAssetToLibrary(assetAbsPath) {
   const ext = path.extname(assetAbsPath).toLowerCase();
   if (!SYNC_EXTS.has(ext)) return null;
@@ -1095,6 +1115,12 @@ function bootSyncAssets() {
         }
       } else if (PLIST_EXTS.has(path.extname(e.name).toLowerCase())) {
         const r = importPlistLogged(p, path.relative(ASSETS, p));
+        if (r) {
+          images++;
+          r.changed.length ? synced++ : skipped++;
+        }
+      } else if (GLTF_EXTS.has(path.extname(e.name).toLowerCase())) {
+        const r = importGltfLogged(p, path.relative(ASSETS, p));
         if (r) {
           images++;
           r.changed.length ? synced++ : skipped++;
@@ -1427,6 +1453,11 @@ server.listen(PORT, () => {
           if (fs.existsSync(abs)) importPlistLogged(abs, rel);
           return;
         }
+        if (GLTF_EXTS.has(ext)) {
+          const abs = path.join(ASSETS, rel);
+          if (fs.existsSync(abs)) importGltfLogged(abs, rel);
+          return;
+        }
         if (TEXT_EXTS.has(ext)) {
           const abs = path.join(ASSETS, rel);
           if (!fs.existsSync(abs)) return;
@@ -1469,7 +1500,7 @@ server.listen(PORT, () => {
       if (WATCH_POLL) {
         makePollingWatcher(ASSETS, (_kind, rel) => onAssetChange(rel), {
           skipRegex: /\.git|\.meta\.tmp$|~$/,
-          isTracked: (name) => /\.(ts|js|meta|scene|prefab|mtl|anim|animgraph|json|skel|png|jpe?g|mp3|wav|ogg|aac|m4a|ttf|fnt|atlas|plist|txt|csv|ya?ml|conf|md)$/i.test(name),
+          isTracked: (name) => /\.(ts|js|meta|scene|prefab|mtl|anim|animgraph|json|skel|png|jpe?g|mp3|wav|ogg|aac|m4a|ttf|fnt|atlas|plist|txt|csv|ya?ml|conf|md|gltf|glb)$/i.test(name),
         });
       }
       // Prime: sync all JSON assets once, then build scripts once

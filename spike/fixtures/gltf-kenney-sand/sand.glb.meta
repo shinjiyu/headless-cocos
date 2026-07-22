@@ -1,0 +1,124 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "da8a7402-e5cc-4eac-94e5-c347ce7537a5",
+  "files": [],
+  "subMetas": {
+    "46899": {
+      "importer": "gltf-mesh",
+      "uuid": "da8a7402-e5cc-4eac-94e5-c347ce7537a5@46899",
+      "displayName": "",
+      "id": "46899",
+      "name": "sand.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 32
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "96c50": {
+      "importer": "texture",
+      "uuid": "da8a7402-e5cc-4eac-94e5-c347ce7537a5@96c50",
+      "displayName": "",
+      "id": "96c50",
+      "name": "colormap.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "nearest",
+        "magfilter": "nearest",
+        "mipfilter": "nearest",
+        "anisotropy": 0,
+        "isUuid": false,
+        "imageUuidOrDatabaseUri": "db://assets/AssetPool/kenney/kenney-local/asset_06da9db8b2fdef8f/Textures/colormap.png"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "9991c": {
+      "importer": "gltf-material",
+      "uuid": "da8a7402-e5cc-4eac-94e5-c347ce7537a5@9991c",
+      "displayName": "",
+      "id": "9991c",
+      "name": "colormap.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "406e2": {
+      "importer": "gltf-scene",
+      "uuid": "da8a7402-e5cc-4eac-94e5-c347ce7537a5@406e2",
+      "displayName": "",
+      "id": "406e2",
+      "name": "sand.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "colormap",
+        "uri": "db://assets/AssetPool/kenney/kenney-local/asset_06da9db8b2fdef8f/Textures/colormap.png"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "da8a7402-e5cc-4eac-94e5-c347ce7537a5@46899"
+      ],
+      "skeletons": [],
+      "textures": [
+        "da8a7402-e5cc-4eac-94e5-c347ce7537a5@96c50"
+      ],
+      "materials": [
+        "da8a7402-e5cc-4eac-94e5-c347ce7537a5@9991c"
+      ],
+      "scenes": [
+        "da8a7402-e5cc-4eac-94e5-c347ce7537a5@406e2"
+      ]
+    },
+    "imageFindOrder": []
+  }
+}

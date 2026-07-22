@@ -70,6 +70,7 @@ Creator remains useful for authoring and one-time snapshots. Day-to-day preview 
 | Fonts | TTF → `TTFFont`; BMFont (`.fnt` + pages) → `BitmapFont` |
 | Spine | 3.8 & 4.2 (`.skel` / JSON + atlas), version from project settings |
 | Particles / atlases | `.plist` → `ParticleAsset` or `SpriteAtlas` |
+| glTF / GLB (MVP) | Static mesh → `Mesh` + `Material` + prefab |
 | Text | `.txt` / `.csv` / `.yaml` / `.md` / … → `TextAsset` |
 | JSON data | Plain JSON → `JsonAsset` |
 | Clips / graphs | `.anim` / `.animgraph` (+ marionette when enabled) |
