@@ -103,7 +103,7 @@ function parseGlb(buf) {
   }
   if (!json) throw new Error('GLB missing JSON chunk');
   const doc = { json, bin, buffers: [bin] };
-  return decodeDracoMeshes(decodeMeshoptViews(doc));
+  return decodeDracoMeshes(flattenDocBuffers(decodeMeshoptViews(doc)));
 }
 
 function loadBufferUri(assetPath, bufDesc) {
@@ -127,7 +127,62 @@ function loadGltf(assetPath) {
   const buffers = (json.buffers || []).map((b) => loadBufferUri(assetPath, b));
   const bin = buffers[0] || Buffer.alloc(0);
   const doc = { json, bin, buffers };
-  return decodeDracoMeshes(decodeMeshoptViews(doc));
+  return decodeDracoMeshes(flattenDocBuffers(decodeMeshoptViews(doc)));
+}
+
+/**
+ * Concatenate all glTF buffers into buffer 0 and rewrite bufferViews.
+ * No-op when every view already uses buffer 0 (or there are no views).
+ * Runs after meshopt expand; Draco then appends into the same buffer 0.
+ */
+function flattenDocBuffers(doc) {
+  const views = doc.json.bufferViews || [];
+  const needs =
+    (doc.buffers && doc.buffers.length > 1) ||
+    views.some((v) => (v.buffer || 0) !== 0);
+  if (!needs) {
+    if (doc.buffers && doc.buffers[0] && doc.buffers[0] !== doc.bin) {
+      doc.bin = doc.buffers[0];
+    }
+    return doc;
+  }
+
+  const parts = [];
+  let offset = 0;
+  const baseOf = [];
+  const n = Math.max(
+    doc.buffers ? doc.buffers.length : 0,
+    (doc.json.buffers || []).length,
+    1,
+  );
+  for (let i = 0; i < n; i++) {
+    const pad = (4 - (offset % 4)) % 4;
+    if (pad) {
+      parts.push(Buffer.alloc(pad));
+      offset += pad;
+    }
+    baseOf[i] = offset;
+    let buf;
+    try {
+      buf = getDocBuffer(doc, i);
+    } catch {
+      buf = Buffer.alloc(0);
+    }
+    parts.push(buf);
+    offset += buf.length;
+  }
+
+  for (const view of views) {
+    const bi = view.buffer || 0;
+    view.buffer = 0;
+    view.byteOffset = (baseOf[bi] || 0) + (view.byteOffset || 0);
+  }
+
+  const bin = parts.length ? Buffer.concat(parts) : Buffer.alloc(0);
+  doc.bin = bin;
+  doc.buffers = [bin];
+  doc.json.buffers = [{ byteLength: bin.length }];
+  return doc;
 }
 
 // ---- meshopt (EXT_/KHR_meshopt_compression) ----
@@ -471,12 +526,9 @@ function parseGlbRaw(buf) {
 function bufferViewByteBase(doc, bufferViewIndex, byteOffset = 0) {
   const view = doc.json.bufferViews[bufferViewIndex];
   if (!view) throw new Error(`missing bufferView ${bufferViewIndex}`);
-  const buf = getDocBuffer(doc, view.buffer);
-  // Absolute offset into the Node Buffer that backs this view's buffer index.
-  // After meshopt expand, everything lives in buffers[0] === bin.
-  if (buf !== doc.bin && buf !== (doc.buffers && doc.buffers[0])) {
-    // Multi-buffer sparse before expand is unsupported; expand meshopt first.
-    throw new Error('sparse/accessor read requires buffer 0 (decode meshopt first)');
+  // After flattenDocBuffers / meshopt, views live in buffers[0] === bin.
+  if ((view.buffer || 0) !== 0) {
+    throw new Error('bufferView not on buffer 0 (call flattenDocBuffers first)');
   }
   return (view.byteOffset || 0) + (byteOffset || 0);
 }
@@ -495,7 +547,9 @@ function accessorInfo(doc, accessorIndex) {
   }
   const view = doc.json.bufferViews[acc.bufferView];
   if (!view) throw new Error(`missing bufferView ${acc.bufferView}`);
-  if ((view.buffer || 0) !== 0) throw new Error('only buffer 0 supported');
+  if ((view.buffer || 0) !== 0) {
+    throw new Error('only buffer 0 supported (flattenDocBuffers should run first)');
+  }
   const base = (view.byteOffset || 0) + (acc.byteOffset || 0);
   const stride = view.byteStride || comp.size * count;
   return { acc, count, comp, base, stride, view };
@@ -1552,7 +1606,9 @@ function writeEmbeddedImage(assetPath, doc, imageIndex, changed) {
     bytes = Buffer.from(m[2], 'base64');
   } else if (img.bufferView != null) {
     const view = doc.json.bufferViews[img.bufferView];
-    bytes = doc.bin.slice(view.byteOffset || 0, (view.byteOffset || 0) + view.byteLength);
+    const src = getDocBuffer(doc, view.buffer || 0);
+    const start = view.byteOffset || 0;
+    bytes = Buffer.from(src.buffer, src.byteOffset + start, view.byteLength);
     if ((img.mimeType || '').includes('jpeg')) ext = '.jpg';
   } else {
     throw new Error(`image ${imageIndex} has no uri/bufferView`);

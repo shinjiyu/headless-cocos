@@ -8,6 +8,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 |-----------|------------------------|
 | `.gltf` + external `.bin` / images | Cameras / lights (**Creator also skips** — not planned) |
 | `.glb` (JSON + BIN chunks) | **KHR_materials_transmission** (no builtin effect) |
+| **Multi-buffer** (external bins flattened to buffer 0) | |
 | `.fbx` via Creator `FBX2glTF` → glTF | |
 | **EXT_/KHR_meshopt_compression** (`meshoptimizer`) | |
 | **KHR_draco_mesh_compression** (`draco3dgltf`) | |
@@ -61,7 +62,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -84,6 +85,7 @@ node .\spike\e2e-gltf-ior-anisotropy.cjs
 node .\spike\e2e-gltf-sparse.cjs
 node .\spike\e2e-gltf-meshopt.cjs
 node .\spike\e2e-gltf-draco.cjs
+node .\spike\e2e-gltf-multibuffer.cjs
 node .\spike\e2e-polyhaven.cjs
 node .\spike\e2e-fbx.cjs
 ```
@@ -160,3 +162,8 @@ Draco (`fixtures/gltf-draco/draco.gltf`):
 - `KHR_draco_mesh_compression` on the primitive (POSITION / NORMAL / TEXCOORD_0)
 - Requires `draco3dgltf` + `prepareDraco()` / `importGltfAsync`
 - Expanded after meshopt so a meshopt-wrapped Draco bitstream still works
+
+Multi-buffer (`fixtures/gltf-multibuffer/multibuffer.gltf`):
+
+- Positions in `pos.bin` (buffer 0); normals / UVs / indices in `rest.bin` (buffer 1)
+- Flattened to a single buffer 0 before accessor / embedded-image reads

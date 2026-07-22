@@ -1,0 +1,94 @@
+{
+  "uuid": "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4",
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "files": [],
+  "subMetas": {
+    "d6b8e": {
+      "importer": "gltf-material",
+      "uuid": "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4@d6b8e",
+      "displayName": "",
+      "id": "d6b8e",
+      "name": "default.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "a4bd7": {
+      "importer": "gltf-mesh",
+      "uuid": "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4@a4bd7",
+      "displayName": "",
+      "id": "a4bd7",
+      "name": "MultiBufTri.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 1
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "34fac": {
+      "importer": "gltf-scene",
+      "uuid": "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4@34fac",
+      "displayName": "",
+      "id": "34fac",
+      "name": "multibuffer.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "assetFinder": {
+      "meshes": [
+        "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4@a4bd7"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4@d6b8e"
+      ],
+      "scenes": [
+        "b10ac4f7-9fef-4b47-a7c2-8e89c9ddb3a4@34fac"
+      ]
+    },
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "imageFindOrder": []
+  }
+}
