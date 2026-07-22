@@ -19,6 +19,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | **alphaMode** MASK / BLEND (+ doubleSided) | |
 | Preserve Creator `.meta` sub-ids | |
 | **Poly Haven fetch** → `importGltf` (`docs/polyhaven.md`) | |
+| Mirror **`/__polyhaven?spawn=1`** → instantiate prefab in preview | |
 
 ## Library products
 

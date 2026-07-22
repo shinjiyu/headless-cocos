@@ -127,6 +127,12 @@ function sendFile(res, filePath, via) {
 function sendMapped(res, mapped) {
   if (!mapped) return false;
   if (typeof mapped === 'string') return sendFile(res, mapped, 'disk');
+  if (mapped.rewrite === 'index-html') {
+    if (!fs.existsSync(mapped.file)) return false;
+    const body = rewriteIndexHtml(fs.readFileSync(mapped.file, 'utf8'));
+    send(res, 200, body, 'text/html; charset=utf-8', 'index-spawn');
+    return true;
+  }
   if (mapped.rewrite === 'settings') {
     if (!fs.existsSync(mapped.file)) return false;
     const body = rewriteSettings(fs.readFileSync(mapped.file, 'utf8'));
@@ -178,6 +184,10 @@ const SOCKET_IO_STUB = `System.register([], function (_export) {
             try { msg = JSON.parse(ev.data); } catch (e) { return; }
             var list = handlers[msg.event] || [];
             for (var i = 0; i < list.length; i++) list[i].apply(null, msg.args || []);
+            // Headless spawn: also invoke window.__headlessSpawn if present.
+            if (msg.event === 'browser:spawn' && typeof window.__headlessSpawn === 'function') {
+              try { window.__headlessSpawn.apply(null, msg.args || []); } catch (e) { console.warn('[headless-spawn]', e); }
+            }
           };
         } catch (e) {
           console.warn('[preview-mirror] hmr ws failed', e);
@@ -204,6 +214,97 @@ const SOCKET_IO_STUB = `System.register([], function (_export) {
     }
   };
 });`;
+
+/** Injected into index.html — loads pending prefab uuid after engine boots. */
+const SPAWN_BOOT_SCRIPT = `<script data-headless-spawn="1">
+(function () {
+  function spawnPrefab(opts) {
+    opts = opts || {};
+    var uuid = opts.uuid;
+    if (!uuid) return Promise.reject(new Error('missing uuid'));
+    return new Promise(function (resolve, reject) {
+      var n = 0;
+      function tick() {
+        var cc = window.cc;
+        if (!cc || !cc.assetManager || !cc.director || !cc.director.getScene()) {
+          if (++n < 300) return setTimeout(tick, 50);
+          return reject(new Error('engine not ready'));
+        }
+        cc.assetManager.loadAny({ uuid: uuid }, function (err, prefab) {
+          if (err) return reject(err);
+          try {
+            var name = opts.name || ('spawn_' + String(uuid).slice(0, 8));
+            var scene = cc.director.getScene();
+            if (opts.clear !== false) {
+              var old = scene.getChildByName(name);
+              if (old) old.destroy();
+            }
+            var node = cc.instantiate(prefab);
+            node.name = name;
+            if (opts.position) {
+              node.setPosition(opts.position.x || 0, opts.position.y || 0, opts.position.z || 0);
+            }
+            scene.addChild(node);
+            var info = {
+              uuid: uuid,
+              name: name,
+              childCount: node.children ? node.children.length : 0,
+              hasMeshRenderer: !!(cc.MeshRenderer && node.getComponentInChildren(cc.MeshRenderer)),
+            };
+            window.__HEADLESS_SPAWNED__ = info;
+            console.log('[headless-spawn]', info);
+            resolve(info);
+          } catch (e) { reject(e); }
+        });
+      }
+      tick();
+    });
+  }
+  window.__headlessSpawn = spawnPrefab;
+  function tryPending() {
+    fetch('/__spawn-pending')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.uuid) return;
+        return spawnPrefab(j);
+      })
+      .catch(function (e) { console.warn('[headless-spawn] pending', e); });
+  }
+  if (document.readyState === 'complete') tryPending();
+  else window.addEventListener('load', tryPending);
+})();
+</script>`;
+
+let pendingSpawn = null; // { uuid, name?, position?, clear?, t }
+
+function setPendingSpawn(opts) {
+  if (!opts || !opts.uuid) {
+    pendingSpawn = null;
+    return null;
+  }
+  pendingSpawn = {
+    uuid: opts.uuid,
+    name: opts.name || undefined,
+    position: opts.position || undefined,
+    clear: opts.clear !== false,
+    t: Date.now(),
+  };
+  return pendingSpawn;
+}
+
+function consumePendingSpawn() {
+  const cur = pendingSpawn;
+  pendingSpawn = null;
+  return cur;
+}
+
+function rewriteIndexHtml(html) {
+  if (html.includes('data-headless-spawn="1"')) return html;
+  if (html.includes('</body>')) {
+    return html.replace('</body>', SPAWN_BOOT_SCRIPT + '\n</body>');
+  }
+  return html + SPAWN_BOOT_SCRIPT;
+}
 
 async function proxy(req, res) {
   if (!UPSTREAM) {
@@ -683,7 +784,7 @@ function rewriteEngineImportMap(json) {
 function mapPath(urlPath) {
   const q = urlPath.indexOf('?');
   const p = q >= 0 ? urlPath.slice(0, q) : urlPath;
-  if (p === '/' || p === '/index.html') return path.join(CACHE, 'index.html');
+  if (p === '/' || p === '/index.html') return { file: path.join(CACHE, 'index.html'), rewrite: 'index-html' };
   if (p === '/index.css') return path.join(CACHE, 'index.css');
   if (p === '/favicon.ico') return path.join(CACHE, 'favicon.ico');
   if (p === '/settings.js' || p.startsWith('/settings.js')) return { file: path.join(CACHE, 'settings.js'), rewrite: 'settings' };
@@ -880,6 +981,18 @@ function broadcastReload(reason) {
     t: Date.now(),
   });
   console.log('[hmr] browser:reload', reason || 'disk', 'clients=' + hmrClients.size, 'seq=' + reloadSeq);
+  for (const ws of hmrClients) {
+    if (ws.readyState === 1) ws.send(payload);
+  }
+}
+
+function broadcastSpawn(opts) {
+  const payload = JSON.stringify({
+    event: 'browser:spawn',
+    args: [opts],
+    t: Date.now(),
+  });
+  console.log('[hmr] browser:spawn', opts && opts.uuid, 'clients=' + hmrClients.size);
   for (const ws of hmrClients) {
     if (ws.readyState === 1) ws.send(payload);
   }
@@ -1341,7 +1454,41 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Poly Haven: GET/POST /__polyhaven?id=wooden_table_02&res=1k
+  // Spawn queue: GET /__spawn-pending (oneshot)
+  //           GET/POST /__spawn?uuid=<prefab>&name=&reload=0|1
+  {
+    const u = new URL(urlPath, 'http://127.0.0.1');
+    if (u.pathname === '/__spawn-pending') {
+      const cur = consumePendingSpawn();
+      send(res, 200, JSON.stringify(cur || {}), 'application/json; charset=utf-8', 'spawn');
+      return;
+    }
+    if (u.pathname === '/__spawn') {
+      const uuid = u.searchParams.get('uuid');
+      if (!uuid) {
+        send(
+          res,
+          400,
+          JSON.stringify({ ok: false, error: 'missing ?uuid=', usage: '/__spawn?uuid=<prefabUuid>&name=foo' }),
+          'application/json; charset=utf-8',
+          'spawn',
+        );
+        return;
+      }
+      const job = setPendingSpawn({
+        uuid,
+        name: u.searchParams.get('name') || undefined,
+        clear: u.searchParams.get('clear') !== '0',
+      });
+      const doReload = u.searchParams.get('reload') === '1';
+      if (doReload) broadcastReload(`spawn:${uuid}`);
+      else broadcastSpawn(job);
+      send(res, 200, JSON.stringify({ ok: true, spawn: job, reload: doReload }), 'application/json; charset=utf-8', 'spawn');
+      return;
+    }
+  }
+
+  // Poly Haven: GET/POST /__polyhaven?id=wooden_table_02&res=1k&spawn=1
   //             GET /__polyhaven/list?maxPoly=1000&limit=20
   {
     const u = new URL(urlPath, 'http://127.0.0.1');
@@ -1367,7 +1514,7 @@ const server = http.createServer(async (req, res) => {
         send(
           res,
           400,
-          JSON.stringify({ ok: false, error: 'missing ?id=', usage: '/__polyhaven?id=wooden_table_02&res=1k' }),
+          JSON.stringify({ ok: false, error: 'missing ?id=', usage: '/__polyhaven?id=wooden_table_02&res=1k&spawn=1' }),
           'application/json; charset=utf-8',
           'polyhaven',
         );
@@ -1379,6 +1526,7 @@ const server = http.createServer(async (req, res) => {
       }
       try {
         const resolution = u.searchParams.get('res') || '1k';
+        const wantSpawn = u.searchParams.get('spawn') === '1' || u.searchParams.get('spawn') === 'true';
         const destDir = path.join(ASSETS, 'polyhaven', id);
         console.log('[polyhaven] fetch', id, `@${resolution}`, '→', destDir);
         const pkg = await fetchModel(id, destDir, { resolution });
@@ -1391,6 +1539,12 @@ const server = http.createServer(async (req, res) => {
           `mats=${r.materials.length}`,
           `→ ${r.uuid}`,
         );
+        const prefabUuid = r.scenes && r.scenes[0];
+        let spawn = null;
+        if (wantSpawn && prefabUuid) {
+          spawn = setPendingSpawn({ uuid: prefabUuid, name: id, clear: true });
+          console.log('[polyhaven] spawn queued', prefabUuid);
+        }
         if (typeof broadcastReload === 'function') broadcastReload(`polyhaven:${id}`);
         send(
           res,
@@ -1405,6 +1559,7 @@ const server = http.createServer(async (req, res) => {
             materials: r.materials,
             textures: r.textures,
             scenes: r.scenes,
+            spawn,
             source: `https://polyhaven.com/a/${encodeURIComponent(id)}`,
           }),
           'application/json; charset=utf-8',
