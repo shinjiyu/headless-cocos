@@ -8,7 +8,7 @@
  * [/ TANGENT] [/ JOINTS+WEIGHTS top-4] [/ morph] [/ sparse] [/ meshopt] [/ Draco]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
  * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + sheen→fabric +
- * unlit + emissive_strength + ior/specular + anisotropy),
+ * variants (import-time bake) + unlit + emissive_strength + ior/specular + anisotropy),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
  * No lights / cameras (Creator also skips). Transmission still out of scope.
  */
@@ -2079,7 +2079,54 @@ function findExistingSubId(meta, importer, gltfIndex, nameHint) {
   return null;
 }
 
-function importGltf(assetPath, libraryRoot) {
+/** Root KHR_materials_variants names (empty if extension absent). */
+function materialVariantNames(doc) {
+  const root =
+    doc.json.extensions && doc.json.extensions.KHR_materials_variants;
+  if (!root || !Array.isArray(root.variants)) return [];
+  return root.variants.map((v, i) => (v && v.name) || `variant_${i}`);
+}
+
+/**
+ * Resolve options.variant (name or index) → variant index, or null for default
+ * primitive.material.
+ */
+function resolveVariantIndex(names, options = {}) {
+  if (!names.length) return null;
+  const v = options.variant;
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const i = v | 0;
+    if (i < 0 || i >= names.length) {
+      throw new Error(`material variant index ${i} out of range 0..${names.length - 1}`);
+    }
+    return i;
+  }
+  const name = String(v);
+  const idx = names.indexOf(name);
+  if (idx < 0) throw new Error(`unknown material variant "${name}"`);
+  return idx;
+}
+
+/**
+ * Pick material index for a primitive under an active variant (Creator has no
+ * runtime switcher — bake at import). Falls back to primitive.material.
+ */
+function resolvePrimitiveMaterialIndex(prim, variantIndex) {
+  const fallback = prim.material != null ? prim.material : 0;
+  if (variantIndex == null) return fallback;
+  const ext =
+    prim.extensions && prim.extensions.KHR_materials_variants;
+  const mappings = ext && ext.mappings;
+  if (!Array.isArray(mappings)) return fallback;
+  for (const m of mappings) {
+    if (!m || m.material == null || !Array.isArray(m.variants)) continue;
+    if (m.variants.indexOf(variantIndex) >= 0) return m.material;
+  }
+  return fallback;
+}
+
+function importGltf(assetPath, libraryRoot, options = {}) {
   const ext = path.extname(assetPath).toLowerCase();
   if (!GLTF_EXTS.has(ext)) return null;
 
@@ -2108,6 +2155,17 @@ function importGltf(assetPath, libraryRoot) {
   meta.files = [];
   meta.subMetas ||= {};
   meta.userData ||= {};
+
+  const variantNames = materialVariantNames(doc);
+  const activeVariant = resolveVariantIndex(variantNames, options);
+  if (variantNames.length) {
+    meta.userData.materialVariants = {
+      names: variantNames,
+      active: activeVariant,
+    };
+  } else {
+    delete meta.userData.materialVariants;
+  }
 
   const meshes = doc.json.meshes || [];
   const materials = doc.json.materials || [];
@@ -2180,8 +2238,16 @@ function importGltf(assetPath, libraryRoot) {
   const vertexColorMats = new Set();
   for (const mesh of meshes) {
     for (const p of mesh.primitives || []) {
-      if (p.attributes && p.attributes.COLOR_0 != null) {
-        vertexColorMats.add(p.material != null ? p.material : 0);
+      if (!(p.attributes && p.attributes.COLOR_0 != null)) continue;
+      vertexColorMats.add(resolvePrimitiveMaterialIndex(p, null));
+      const maps =
+        p.extensions &&
+        p.extensions.KHR_materials_variants &&
+        p.extensions.KHR_materials_variants.mappings;
+      if (Array.isArray(maps)) {
+        for (const m of maps) {
+          if (m && m.material != null) vertexColorMats.add(m.material);
+        }
       }
     }
   }
@@ -2275,7 +2341,9 @@ function importGltf(assetPath, libraryRoot) {
     if (writeJsonIfChanged(path.join(dir, `${subUuid}.json`), built.meshJson)) changed.push(`${subUuid}.json`);
     if (writeBytesIfChanged(path.join(dir, `${subUuid}.bin`), built.bin)) changed.push(`${subUuid}.bin`);
     meshIds.push(subUuid);
-    meshMaterialSlots.push(built.materialIndices);
+    meshMaterialSlots.push(
+      (mesh.primitives || []).map((p) => resolvePrimitiveMaterialIndex(p, activeVariant)),
+    );
   }
 
   // --- animations (ExoticAnimation CCON) ---
@@ -2385,6 +2453,9 @@ function importGltf(assetPath, libraryRoot) {
     scenes: sceneIds,
     animations: animationIds,
     skeletons: skeletonIds,
+    variants: variantNames.length
+      ? { names: variantNames, active: activeVariant }
+      : null,
     changed,
   };
 }

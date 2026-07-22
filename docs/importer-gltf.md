@@ -19,6 +19,7 @@ Headless importer for Cocos Creator 3.8 mesh assets.
 | **KHR_texture_transform** → `tilingOffset` | |
 | **KHR_materials_clearcoat** → `car-paint` effect | |
 | **KHR_materials_sheen** → `fabric` effect | |
+| **KHR_materials_variants** (import-time bake via `options.variant`) | |
 | **KHR_materials_unlit** → `builtin-unlit` | |
 | **KHR_materials_emissive_strength** → `emissiveScale` | |
 | **KHR_materials_ior** / **specular** → `specularIntensity` | |
@@ -63,7 +64,7 @@ Override with `FBX2GLTF`. Intermediate `.glb` is written under `os.tmpdir()/fbx2
 - `spike/importers/ccon.cjs` — CCON v2 encode/decode (vendored notepack)
 - `spike/importers/fbx.cjs` — FBX → glTF → importGltf
 - Mirror: `PACKER=mini` boot + watcher
-- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-sheen.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-gltf-joints1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
+- E2E: `e2e-gltf.cjs`, `e2e-gltf-hierarchy.cjs`, `e2e-gltf-anim.cjs`, `e2e-gltf-skin.cjs`, `e2e-gltf-morph.cjs`, `e2e-gltf-pbr.cjs`, `e2e-gltf-alpha.cjs`, `e2e-gltf-color-uv1.cjs`, `e2e-gltf-uv1-transform.cjs`, `e2e-gltf-clearcoat.cjs`, `e2e-gltf-sheen.cjs`, `e2e-gltf-variants.cjs`, `e2e-gltf-unlit.cjs`, `e2e-gltf-emissive-strength.cjs`, `e2e-gltf-ior-anisotropy.cjs`, `e2e-gltf-sparse.cjs`, `e2e-gltf-meshopt.cjs`, `e2e-gltf-draco.cjs`, `e2e-gltf-multibuffer.cjs`, `e2e-gltf-joints1.cjs`, `e2e-polyhaven.cjs`, `e2e-fbx.cjs`
 - Online assets: [`docs/polyhaven.md`](polyhaven.md)
 
 ## Verify
@@ -81,6 +82,7 @@ node .\spike\e2e-gltf-color-uv1.cjs
 node .\spike\e2e-gltf-uv1-transform.cjs
 node .\spike\e2e-gltf-clearcoat.cjs
 node .\spike\e2e-gltf-sheen.cjs
+node .\spike\e2e-gltf-variants.cjs
 node .\spike\e2e-gltf-unlit.cjs
 node .\spike\e2e-gltf-emissive-strength.cjs
 node .\spike\e2e-gltf-ior-anisotropy.cjs
@@ -142,6 +144,12 @@ Sheen (`fixtures/gltf-sheen/sheen.gltf`):
 - `sheenColorFactor` → `sheenColor`; `sheenRoughnessFactor` → `sheenRoughness`
 - Optional `sheenColorTexture` / `sheenRoughnessTexture` → `USE_SHEEN_COLOR_MAP` / `USE_SHEEN_DATA_MAP`
 - Clearcoat wins if both extensions are present
+
+Variants (`fixtures/gltf-variants/variants.gltf`):
+
+- Root `KHR_materials_variants` names → `meta.userData.materialVariants` + `result.variants`
+- Primitive mappings baked into MeshRenderer slots via `importGltf(path, lib, { variant: 'Yellow' | 0 })`
+- Default (no option) keeps `primitive.material`
 - Optional coat textures → `coatDataMap` (Creator channel pack differs from glTF)
 
 Unlit (`fixtures/gltf-unlit/unlit.gltf`):
