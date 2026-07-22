@@ -7,8 +7,8 @@
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
  * [/ TANGENT] [/ JOINTS+WEIGHTS top-4] [/ morph] [/ sparse] [/ meshopt] [/ Draco]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
- * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit +
- * emissive_strength + ior/specular + anisotropy),
+ * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + sheen→fabric +
+ * unlit + emissive_strength + ior/specular + anisotropy),
  * full node hierarchy, ExoticAnimation clips, morph-weight tracks, and skins.
  * No lights / cameras (Creator also skips). Transmission still out of scope.
  */
@@ -24,6 +24,8 @@ const GLTF_EXTS = new Set(['.gltf', '.glb']);
 const STANDARD_EFFECT = 'c8f66d17-351a-48da-a12c-0212d28575c4';
 // advanced/car-paint.effect — used when KHR_materials_clearcoat is present
 const CAR_PAINT_EFFECT = '304a12db-3955-46e4-b712-e5e26f45258b';
+// advanced/fabric.effect — used when KHR_materials_sheen is present
+const FABRIC_EFFECT = 'b25c7601-1d07-4a56-86c5-62e83ea7c61e';
 // builtin-unlit.effect — used when KHR_materials_unlit is present
 const UNLIT_EFFECT = 'a3cd009f-0ab0-420d-9278-b9fdab939bbc';
 
@@ -1819,6 +1821,7 @@ function materialJsonUnlit(mat, textureIds, options = {}) {
  *   texCoord=1 → HAS_SECOND_UV + v_uv1 macros
  *   KHR_texture_transform on baseColor → tilingOffset
  *   KHR_materials_clearcoat → car-paint effect + coatRoughness / coatIntensity
+ *   KHR_materials_sheen → fabric effect + sheenColor / sheenRoughness
  *   KHR_materials_emissive_strength → emissiveScale
  *   KHR_materials_ior / specular → specularIntensity
  *   KHR_materials_anisotropy → IS_ANISOTROPY + anisotropyIntensity/Rotation
@@ -1944,9 +1947,10 @@ function materialJson(mat, textureIds, options = {}) {
     defines[0].HAS_SECOND_UV = true;
   }
 
-  // KHR_materials_clearcoat → advanced/car-paint (builtin-standard has no coat)
+  // KHR_materials_clearcoat → car-paint; else KHR_materials_sheen → fabric
   const clearcoat =
     mat.extensions && mat.extensions.KHR_materials_clearcoat;
+  const sheen = mat.extensions && mat.extensions.KHR_materials_sheen;
   if (clearcoat) {
     effectUuid = CAR_PAINT_EFFECT;
     // Drop emissive / anisotropy — car-paint has no those paths
@@ -1984,6 +1988,37 @@ function materialJson(mat, textureIds, options = {}) {
     if (coatTex && coatTex.index != null && textureIds[coatTex.index]) {
       props.coatDataMap = texRef(textureIds[coatTex.index]);
       defines[0].USE_COAT_DATA_MAP = true;
+    }
+  } else if (sheen) {
+    effectUuid = FABRIC_EFFECT;
+    // fabric packs sheen into emissiveScaleParam — drop emissive props
+    delete defines[0].USE_EMISSIVE_MAP;
+    delete defines[0].EMISSIVE_UV;
+    delete props.emissiveMap;
+    delete props.emissive;
+    delete props.emissiveScale;
+
+    const sheenRgb = Array.isArray(sheen.sheenColorFactor)
+      ? sheen.sheenColorFactor
+      : [0, 0, 0];
+    props.sheenColor = colorFromFactor(
+      [sheenRgb[0] != null ? sheenRgb[0] : 0, sheenRgb[1] != null ? sheenRgb[1] : 0, sheenRgb[2] != null ? sheenRgb[2] : 0, 1],
+      [0, 0, 0, 1],
+    );
+    props.sheenRoughness =
+      sheen.sheenRoughnessFactor != null ? sheen.sheenRoughnessFactor : 0;
+    props.sheenOpacity = 1;
+    props.sheenIntensity = 1;
+
+    const sheenColorTex = sheen.sheenColorTexture;
+    if (sheenColorTex && sheenColorTex.index != null && textureIds[sheenColorTex.index]) {
+      props.sheenColorMap = texRef(textureIds[sheenColorTex.index]);
+      defines[0].USE_SHEEN_COLOR_MAP = true;
+    }
+    const sheenRoughTex = sheen.sheenRoughnessTexture;
+    if (sheenRoughTex && sheenRoughTex.index != null && textureIds[sheenRoughTex.index]) {
+      props.sheenDataMap = texRef(textureIds[sheenRoughTex.index]);
+      defines[0].USE_SHEEN_DATA_MAP = true;
     }
   }
 
@@ -2358,6 +2393,7 @@ module.exports = {
   GLTF_EXTS,
   STANDARD_EFFECT,
   CAR_PAINT_EFFECT,
+  FABRIC_EFFECT,
   UNLIT_EFFECT,
   prepareMeshopt,
   prepareDraco,
