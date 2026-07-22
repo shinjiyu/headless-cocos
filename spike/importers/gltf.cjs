@@ -5,7 +5,7 @@
  * Minimal Cocos Creator 3.8 glTF / GLB importer for headless preview.
  *
  * Scope: meshes (POSITION / NORMAL / TEXCOORD_0 [/ TEXCOORD_1] [/ COLOR_0]
- * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT]),
+ * [/ TANGENT] [/ JOINTS+WEIGHTS] [/ morph POSITION+NORMAL+TANGENT] [/ sparse]),
  * PBR materials (albedo/normal/pbrMap/occlusion/emissive + vertex color +
  * texCoord UV sets + KHR_texture_transform + clearcoat→car-paint + unlit +
  * emissive_strength + ior/specular + anisotropy),
@@ -123,6 +123,13 @@ function loadGltf(assetPath) {
   return { json, bin };
 }
 
+function bufferViewByteBase(doc, bufferViewIndex, byteOffset = 0) {
+  const view = doc.json.bufferViews[bufferViewIndex];
+  if (!view) throw new Error(`missing bufferView ${bufferViewIndex}`);
+  if ((view.buffer || 0) !== 0) throw new Error('only buffer 0 supported');
+  return (view.byteOffset || 0) + (byteOffset || 0);
+}
+
 function accessorInfo(doc, accessorIndex) {
   const acc = doc.json.accessors[accessorIndex];
   if (!acc) throw new Error(`missing accessor ${accessorIndex}`);
@@ -130,6 +137,11 @@ function accessorInfo(doc, accessorIndex) {
   if (!count) throw new Error(`unsupported accessor type ${acc.type}`);
   const comp = COMPONENT[acc.componentType];
   if (!comp) throw new Error(`unsupported componentType ${acc.componentType}`);
+  if (acc.bufferView == null) {
+    // Allowed when sparse is present — initialize with zeros then overlay.
+    if (!acc.sparse) throw new Error(`accessor ${accessorIndex} has no bufferView`);
+    return { acc, count, comp, base: null, stride: null, view: null };
+  }
   const view = doc.json.bufferViews[acc.bufferView];
   if (!view) throw new Error(`missing bufferView ${acc.bufferView}`);
   if ((view.buffer || 0) !== 0) throw new Error('only buffer 0 supported');
@@ -148,18 +160,44 @@ function normalizeComponent(componentType, value) {
   }
 }
 
+/** Overlay accessor.sparse onto a typed array (Float32 or Uint32). */
+function applySparse(doc, acc, out, components, { asFloat }) {
+  const sparse = acc.sparse;
+  if (!sparse || !sparse.count) return;
+  const indicesComp = COMPONENT[sparse.indices.componentType];
+  if (!indicesComp) throw new Error(`unsupported sparse indices type ${sparse.indices.componentType}`);
+  const valuesComp = COMPONENT[acc.componentType];
+  const idxBase = bufferViewByteBase(doc, sparse.indices.bufferView, sparse.indices.byteOffset || 0);
+  const valBase = bufferViewByteBase(doc, sparse.values.bufferView, sparse.values.byteOffset || 0);
+  const idxStride = indicesComp.size;
+  const valStride = valuesComp.size * components;
+  const normalized = !!acc.normalized;
+  for (let s = 0; s < sparse.count; s++) {
+    const index = indicesComp.read(doc.bin, idxBase + s * idxStride) >>> 0;
+    if (index >= acc.count) throw new Error(`sparse index ${index} out of range ${acc.count}`);
+    for (let c = 0; c < components; c++) {
+      let v = valuesComp.read(doc.bin, valBase + s * valStride + c * valuesComp.size);
+      if (asFloat && normalized) v = normalizeComponent(acc.componentType, v);
+      out[index * components + c] = v;
+    }
+  }
+}
+
 function readAccessor(doc, accessorIndex) {
   const { acc, count, comp, base, stride } = accessorInfo(doc, accessorIndex);
   const out = new Float32Array(acc.count * count);
   const normalized = !!acc.normalized;
-  for (let i = 0; i < acc.count; i++) {
-    const row = base + i * stride;
-    for (let c = 0; c < count; c++) {
-      let v = comp.read(doc.bin, row + c * comp.size);
-      if (normalized) v = normalizeComponent(acc.componentType, v);
-      out[i * count + c] = v;
+  if (base != null) {
+    for (let i = 0; i < acc.count; i++) {
+      const row = base + i * stride;
+      for (let c = 0; c < count; c++) {
+        let v = comp.read(doc.bin, row + c * comp.size);
+        if (normalized) v = normalizeComponent(acc.componentType, v);
+        out[i * count + c] = v;
+      }
     }
   }
+  applySparse(doc, acc, out, count, { asFloat: true });
   return {
     values: out,
     count: acc.count,
@@ -192,9 +230,12 @@ function readIndices(doc, accessorIndex) {
   const { acc, count, comp, base, stride } = accessorInfo(doc, accessorIndex);
   if (count !== 1) throw new Error('indices must be SCALAR');
   const out = new Uint32Array(acc.count);
-  for (let i = 0; i < acc.count; i++) {
-    out[i] = comp.read(doc.bin, base + i * stride);
+  if (base != null) {
+    for (let i = 0; i < acc.count; i++) {
+      out[i] = comp.read(doc.bin, base + i * stride);
+    }
   }
+  applySparse(doc, acc, out, 1, { asFloat: false });
   return out;
 }
 
