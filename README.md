@@ -1,23 +1,61 @@
-﻿# Headless Cocos
+﻿<div align="center">
 
-**Headless preview stack for Cocos Creator 3.8.x** — compile TypeScript, import assets, and hot-reload the browser preview **without** keeping the Creator IDE open.
+# Headless Cocos
 
-> Validated on Creator **3.8.8**, Docker Desktop (Windows), and a production playable-ad project with a wiped `library/` rebuilt entirely by our importers.
+### Creator 3.8 headless preview — no IDE required
+
+[![GitHub stars](https://img.shields.io/github/stars/shinjiyu/headless-cocos?style=flat&logo=github)](https://github.com/shinjiyu/headless-cocos/stargazers)
+[![License](https://img.shields.io/badge/license-Research-blue)](./README.md#license)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org/)
+[![Cocos Creator](https://img.shields.io/badge/Cocos%20Creator-3.8.8-orange)](https://www.cocos.com/en/creator)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](./docs/docker.md)
+[![Importers](https://img.shields.io/badge/importers-wipe%20tested-success)](./docs/importers.md)
+
+Compile TypeScript · Import assets · Hot-reload preview — **without** keeping Creator open.
+
+[Documentation](./docs/README.md)
+·
+[中文文档](./README.zh-CN.md)
+·
+[Architecture](./docs/architecture.md)
+·
+[Docker](./docs/docker.md)
+·
+[GitHub](https://github.com/shinjiyu/headless-cocos)
+
+</div>
+
+---
+
+## Notice — What this is
+
+A **Node.js preview stack** that replaces Cocos Creator’s IDE runtime for edit → preview loops (AI agents, CI, remote machines).
+
+Validated on Creator **3.8.8**, Docker Desktop (Windows), and a production **playable-ad** project with `library/` wiped and rebuilt entirely by our importers.
+
+```bash
+git clone https://github.com/shinjiyu/headless-cocos.git
+cd headless-cocos
+# after engine snapshot — see Getting started
+PACKER=mini PORT=7460 PROJECT=/path/to/project \
+  ENGINE_SNAPSHOT=$PWD/spike/engine-snapshot \
+  node spike/preview-mirror.mjs
+```
 
 ---
 
 ## Why
 
-Creator’s edit loop is heavy: Electron IDE → AssetDB → packer worker → preview. For AI agents and CI that only need “edit disk → see result”, that process is the bottleneck.
+Creator’s edit loop is heavy: Electron IDE → AssetDB → packer worker → preview. For agents and CI that only need “edit disk → see result”, that process is the bottleneck.
 
-This repository replaces the IDE’s runtime role with a Node.js service that:
+This repository replaces the IDE’s runtime role with a service that:
 
-1. Serves the same HTTP/WebSocket surface as Creator’s preview
-2. Compiles project scripts with a **mini-packer** built on `@cocos/creator-programming-*`
-3. Imports assets into `library/` with headless **importers**
-4. Pushes HMR reloads when files change
+1. Serves the same HTTP / WebSocket surface as Creator preview  
+2. Compiles project scripts with a **mini-packer** (`@cocos/creator-programming-*`)  
+3. Imports assets into `library/` with headless **importers**  
+4. Pushes HMR reloads when files change  
 
-Creator is still useful for authoring and one-time snapshots. Day-to-day preview iteration does not require it.
+Creator remains useful for authoring and one-time snapshots. Day-to-day preview iteration does not require it.
 
 ---
 
@@ -33,11 +71,11 @@ Creator is still useful for authoring and one-time snapshots. Day-to-day preview
 | Spine | 3.8 & 4.2 (`.skel` / JSON + atlas), version from project settings |
 | Particles / atlases | `.plist` → `ParticleAsset` or `SpriteAtlas` |
 | Text | `.txt` / `.csv` / `.yaml` / `.md` / … → `TextAsset` |
-| JSON data | Plain JSON → `JsonAsset` (serialized wrapper) |
-| Clips / graphs | `.anim` / `.animgraph` sync (+ marionette module when enabled) |
+| JSON data | Plain JSON → `JsonAsset` |
+| Clips / graphs | `.anim` / `.animgraph` (+ marionette when enabled) |
 | Prefabs / scenes | JSON sync into `library/` |
-| Bundles | Auto-discover `isBundle` folders; synthesize `config.json` / `index.js` |
-| Engine builtins | Fallback `internal-library` snapshot (effects, default materials, …) |
+| Bundles | Auto-discover `isBundle`; synthesize `config.json` / `index.js` |
+| Engine builtins | Fallback `internal-library` snapshot |
 | Docker | Self-contained image + compose for bind-mounted projects |
 
 ---
@@ -47,8 +85,7 @@ Creator is still useful for authoring and one-time snapshots. Day-to-day preview
 ```
 ┌─────────────────────┐     edit assets/*      ┌──────────────────────┐
 │  Cursor / CI / IDE  │ ─────────────────────▶ │  Cocos project       │
-└─────────────────────┘                        │  (bind-mounted)      │
-                                               └──────────┬───────────┘
+└─────────────────────┘                        └──────────┬───────────┘
                                                           │ watch
                                                           ▼
                                          ┌────────────────────────────────┐
@@ -61,39 +98,14 @@ Creator is still useful for authoring and one-time snapshots. Day-to-day preview
                           ┌──────────────────────────┼──────────────────────┐
                           ▼                          ▼                      ▼
                    engine-snapshot            library/ (+ internal)    browser preview
-                   (cc + wasm)                imported products        :PORT
 ```
-
-Two packer modes:
 
 | `PACKER` | Behaviour | When to use |
 |----------|-----------|-------------|
-| `mini` | Importers rebuild `library/`; mini-packer rebuilds user scripts | **Default for headless / importer testing** |
-| `creator` | Serve Creator’s existing `temp/.../preview` + `library` as-is | Fidelity baseline against IDE preview |
+| `mini` | Rebuild `library/` + user scripts | **Headless / importer testing** |
+| `creator` | Serve Creator’s existing preview + library | Fidelity baseline vs IDE |
 
----
-
-## Repository layout
-
-```
-headless-cocos/
-├── spike/
-│   ├── preview-mirror.mjs      # HTTP + HMR entry
-│   ├── importers/              # image, audio, font, bmfont, spine, plist, text
-│   ├── packer/build.cjs        # mini-packer
-│   ├── e2e-*.cjs               # end-to-end probes
-│   └── snapshot-from-creator.cjs
-├── docker/
-│   ├── build-context/          # Dockerfile + app copy
-│   ├── docker-compose.yml
-│   ├── docker-compose.playable.yml
-│   └── docker-compose.playable-mini.yml
-├── docs/                       # Detailed documentation
-├── notes/                      # Research / reverse-engineering notes
-└── scripts/                    # asar extract helpers
-```
-
-Large bake artifacts (`engine-snapshot/`, Docker `vendor/`, `node_modules/`) are **not** in git — generate them locally (see [Getting started](docs/getting-started.md)).
+Deep dive: [docs/architecture.md](./docs/architecture.md)
 
 ---
 
@@ -101,58 +113,52 @@ Large bake artifacts (`engine-snapshot/`, Docker `vendor/`, `node_modules/`) are
 
 ### Prerequisites
 
-- Node.js **20+**
-- Cocos Creator **3.8.8** installed once (to snapshot the engine cache)
-- A Creator 3.8 project with `assets/` (and ideally warmed preview once)
-- Optional: Docker Desktop for containerized preview
+- Node.js **≥ 20**
+- Cocos Creator **3.8.8** (one-time, for engine snapshot)
+- A 3.8 project with `assets/`
+- Optional: Docker Desktop
 
-### 1. Clone
+### Clone
 
 ```bash
 git clone https://github.com/shinjiyu/headless-cocos.git
 cd headless-cocos
 ```
 
-### 2. One-time engine snapshot
-
-With Creator installed and a project previewed at least once:
+### One-time engine snapshot
 
 ```powershell
-# Extract programming packages from app.asar (Windows paths)
 npx @electron/asar extract `
   "C:\ProgramData\cocos\editors\Creator\3.8.8\resources\app.asar" `
   tmp-asar-root
 
-# Snapshot engine preview + native wasm (+ optional internal-library)
 node .\spike\snapshot-from-creator.cjs
 ```
 
-Details: [Getting started](docs/getting-started.md#engine-snapshot).
+Details: [Getting started](./docs/getting-started.md)
 
-### 3. Run locally (mini mode)
+### Run (mini mode)
 
 ```powershell
 $env:PACKER = "mini"
 $env:PORT = "7460"
 $env:PROJECT = "D:\path\to\your-cocos-project"
 $env:ENGINE_SNAPSHOT = "$PWD\spike\engine-snapshot"
-$env:LAUNCH_SCENE = "Main"   # optional: scene name or uuid
+$env:LAUNCH_SCENE = "Main"
 node .\spike\preview-mirror.mjs
 ```
 
-Open [http://127.0.0.1:7460/](http://127.0.0.1:7460/).
+Open **http://127.0.0.1:7460/**
 
-### 4. Run in Docker
+### Docker
 
 ```powershell
 cd docker
-# After populating build-context/engine and vendor (see docs/docker.md)
 docker build -t cocos-headless-preview:latest .\build-context
 docker compose up -d
-# → http://127.0.0.1:7460/
 ```
 
-Playable-ad importer stress test (wiped `library/`):
+Importer wipe-test (empty `library/`):
 
 ```powershell
 docker compose -f docker-compose.playable-mini.yml up -d
@@ -161,42 +167,34 @@ docker compose -f docker-compose.playable-mini.yml up -d
 
 ---
 
-## Environment variables
+## Environment
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PROJECT` | — | Absolute path to the Cocos project root |
-| `PORT` | `7460` | HTTP listen port |
+| `PROJECT` | — | Cocos project root |
+| `PORT` | `7460` | HTTP port |
 | `PACKER` | `creator` | `mini` \| `creator` |
-| `ENGINE_SNAPSHOT` | — | Directory with `preview/`, `native-external/`, optional `internal-library/` |
-| `PROJECT_URL` | — | Original `file:///…` URL used for chunk SHA1 (Docker / relocated projects) |
+| `ENGINE_SNAPSHOT` | — | `preview/` + `native-external/` + optional `internal-library/` |
+| `PROJECT_URL` | — | Original `file:///…` for chunk SHA1 (Docker / relocated projects) |
 | `LAUNCH_SCENE` | auto | Scene uuid, name, or path fragment |
-| `WATCH_POLL` | off | Set `1` on Docker Desktop bind mounts |
-| `WATCH_POLL_MS` | `1000` | Poll interval |
-| `MARIONETTE` | off | Force-enable marionette runtime redirects |
-| `SPINE_VERSION` | from project | Override Spine runtime (`3.8` / `4.2`) |
-| `CREATOR_ROOT` | Creator 3.8.8 path | Used when snapshot is absent |
+| `WATCH_POLL` | off | `1` on Docker Desktop bind mounts |
+| `SPINE_VERSION` | from project | `3.8` \| `4.2` |
+| `MARIONETTE` | off | Force marionette runtime |
 
 ---
 
 ## Verification
 
 ```powershell
-# Smoke: navigate preview, assert scene + probe
 node .\spike\probe-real-project.cjs
-
-# HMR: edit TS → browser probe updates
 node .\spike\e2e-hmr.cjs
-
-# Importers (representative)
 node .\spike\e2e-image-import.cjs
 node .\spike\e2e-spine42-binary.cjs
 node .\spike\e2e-plist.cjs
 node .\spike\e2e-bundle.cjs
-node .\spike\e2e-anim-text.cjs
 ```
 
-Importer wipe-test (recommended): copy a project, delete `library/`, run with `PACKER=mini`, confirm the launch scene renders with **0 failed HTTP requests**.
+**Authoritative importer check:** copy a project → delete `library/` → `PACKER=mini` → launch scene renders with **0 failed requests**.
 
 ---
 
@@ -204,32 +202,32 @@ Importer wipe-test (recommended): copy a project, delete `library/`, run with `P
 
 | Doc | Topic |
 |-----|--------|
-| [Getting started](docs/getting-started.md) | Snapshot, local run, troubleshooting |
-| [Architecture](docs/architecture.md) | Mirror, packer overlay, settings rewrite |
-| [Importers](docs/importers.md) | Asset pipeline contracts |
-| [Docker](docs/docker.md) | Image layout, compose, Windows quirks |
-| [Bundles](docs/bundle-support.md) | Asset Bundle synthesis |
-| [Real project boot](docs/real-project-boot.md) | Production project lessons |
-| [Research notes](notes/) | asar / packer reverse-engineering |
+| [中文 README](./README.zh-CN.md) | 中文总览 |
+| [Getting started](./docs/getting-started.md) | Snapshot, first run, troubleshooting |
+| [Architecture](./docs/architecture.md) | Mirror, packer overlay, settings |
+| [Importers](./docs/importers.md) | Asset pipeline contracts |
+| [Docker](./docs/docker.md) | Image bake & compose |
+| [Bundles](./docs/bundle-support.md) | Asset Bundle synthesis |
+| [Docs index](./docs/README.md) | Full index |
 
 ---
 
 ## Limitations
 
-- **Creator 3.8.x only** (validated on 3.8.8). Creator 2.x preview protocol differs.
-- Auto sprite trim (`trimType: auto`) emits untrimmed rects (visually equivalent for transparent padding; no pixel decode in headless).
-- Engine / internal-library snapshots must be produced from a licensed Creator install — not redistributed in this repo.
-- 3D particle systems are out of scope for the current 2D playable pipeline.
+- **Creator 3.8.x only** (validated on 3.8.8)
+- Auto sprite trim emits untrimmed rects (no pixel decode)
+- Engine / `internal-library` snapshots are **not** in git — generate locally
+- 3D particles out of scope for the current 2D playable pipeline
 
 ---
 
 ## License
 
-Research / internal tooling. Engine binaries and `@cocos/*` packages remain subject to Cocos Creator’s license — do not redistribute vendor trees or engine snapshots from a Creator install without compliance review.
+Research / internal tooling. Engine binaries and `@cocos/*` packages remain under **Cocos Creator’s license** — do not redistribute vendor trees or engine snapshots without compliance review.
 
 ---
 
 ## Related
 
-- Sample harness project: [shinjiyu/baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos)
-- Upstream product: [Cocos Creator](https://www.cocos.com/en/creator)
+- Sample harness: [shinjiyu/baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos)
+- Upstream: [Cocos Creator](https://www.cocos.com/en/creator)

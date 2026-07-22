@@ -4,7 +4,8 @@ Technical docs for **headless-cocos** (Creator 3.8 headless preview).
 
 | Document | Audience | Contents |
 |----------|----------|----------|
-| [../README.md](../README.md) | Everyone | Product overview, quick start, env table |
+| [../README.md](../README.md) | Everyone | English landing (badges + nav) |
+| [../README.zh-CN.md](../README.zh-CN.md) | 中文读者 | 中文总览 |
 | [getting-started.md](getting-started.md) | Operators | Snapshot, first run, common failures |
 | [architecture.md](architecture.md) | Contributors | Mirror, packer overlay, settings, HMR |
 | [importers.md](importers.md) | Contributors | Asset import contracts + per-type deep dives |
