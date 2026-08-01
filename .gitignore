@@ -37,3 +37,10 @@ docker/.env.agent-demo
 demo/agent-demo/.env
 demo/agent-demo/_*-sdk-run.jsonl
 
+# PSD artist preview runtime jobs (keep .gitkeep)
+docker/artist-preview/data/jobs/*
+!docker/artist-preview/data/jobs/.gitkeep
+docker/artist-preview/data/template-artifact/*
+!docker/artist-preview/data/template-artifact/.gitkeep
+docker/artist-preview/portal/node_modules/
+
