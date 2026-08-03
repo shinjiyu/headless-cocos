@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+config.local.json
+.onlyclaws.pass
+*.pass
+.secrets/
+data/jobs/*
+!data/jobs/.gitkeep
+data/template-artifact/*
+!data/template-artifact/.gitkeep
+portal/node_modules/
+*.log

@@ -1,0 +1,23 @@
+{
+  "name": "psd-artist-preview-portal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PSD artist preview portal — upload, Photopea shell, convert trigger",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "smoke": "node scripts/smoke-m0.mjs",
+    "smoke:m15": "node scripts/smoke-m15.mjs",
+    "build:loading-h5": "node scripts/build-loading-h5.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ag-psd": "^30.2.0",
+    "busboy": "^1.6.0",
+    "canvas": "^3.2.3",
+    "sharp": "^0.35.3"
+  }
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+    content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,minimal-ui=true" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>{{TITLE}}</title>
+  <style>
+    html { touch-action: none; }
+    body {
+      position: absolute; inset: 0; margin: 0; padding: 0;
+      background: #000; color: #888; overflow: hidden;
+      font-family: Helvetica, Verdana, Arial, sans-serif;
+    }
+    #GameDiv { display: none; }
+    /* BgPlus 式舞台：裁切视口，禁止 cover 平铺整图 */
+    .poke-splash {
+      position: fixed; inset: 0; z-index: 999; overflow: hidden;
+      background-color: #000;
+      --splash-safe-bottom: env(safe-area-inset-bottom);
+    }
+    .splash-layer {
+      position: absolute;
+      left: 0; top: 0;
+      max-width: none;
+      max-height: none;
+      pointer-events: none;
+      user-select: none;
+    }
+    .poke-progress-wrap {
+      position: absolute; left: 0; right: 0; z-index: 3;
+      bottom: calc(var(--splash-safe-bottom) + 14vh);
+      display: flex; justify-content: center;
+      padding: 0 8vw; box-sizing: border-box;
+    }
+    .progress-container {
+      position: relative; width: 82vw; max-width: 680px; height: 16px;
+      background: #303030; border-radius: 999px; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; width: 0%; border-radius: 999px;
+      background: linear-gradient(90deg, #fff 0%, #f0f0f0 100%);
+      transition: width 0.3s ease;
+    }
+    .progress-text {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 14px; font-weight: 700;
+      text-shadow: 0 1px 2px #000;
+    }
+    @media (orientation: landscape) {
+      .poke-progress-wrap {
+        bottom: calc(var(--splash-safe-bottom) + 4vh);
+        padding: 0 14vw;
+      }
+    }
+    @media (orientation: portrait) {
+      .poke-progress-wrap { bottom: calc(var(--splash-safe-bottom) + 6vh); }
+    }
+  </style>
+</head>
+<body>
+  <div id="GameDiv" aria-hidden="true"></div>
+  <div class="poke-splash" id="splash">
+    <img class="splash-layer" id="splashBg" alt="" />
+    <img class="splash-layer" id="splashArt" alt="" />
+    <div class="poke-progress-wrap">
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-text" id="progressText">0%</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.__LOADING_MANIFEST__ = {{MANIFEST_JSON}};
+  </script>
+  <script src="./progress.js"></script>
+</body>
+</html>

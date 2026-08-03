@@ -1,0 +1,51 @@
+# PSD → 美术网页预览
+#
+# 用法（在 docker/artist-preview 目录）:
+#   cp .env.example .env   # 填 CURSOR_API_KEY（勿提交 .env）
+#   docker compose up --build
+# 打开 http://127.0.0.1:8810/
+#
+# 公网 PUBLIC_BASE / AIWS secrets 挂载见 .env.example 与 README。
+
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: portal/Dockerfile
+    container_name: psd-artist-portal
+    ports:
+      - "${PORTAL_HOST_PORT:-8810}:8800"
+    volumes:
+      - ./data/jobs:/data/jobs
+      - ./.cursor/skills:/app/.cursor/skills:ro
+      - ./portal/public:/app/public:ro
+      # 可选：在 .env 设置 AIWS_CONFIG_LOCAL=宿主机绝对路径后启用
+      # - ${AIWS_CONFIG_LOCAL}:/secrets/aiws-config.local.json:ro
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 8800
+      JOBS_ROOT: /data/jobs
+      PUBLIC_BASE: ${PUBLIC_BASE:-http://127.0.0.1:8810}
+      MAX_UPLOAD_BYTES: "2147483648"
+      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
+      CURSOR_MODEL: ${CURSOR_MODEL:-}
+      CURSOR_TIMEOUT_MS: ${CURSOR_TIMEOUT_MS:-600000}
+      AIWS_CONFIG_LOCAL: ${AIWS_CONFIG_LOCAL_IN_CONTAINER:-}
+      SKILLS_ROOT: /app/.cursor/skills
+      LOADING_TEMPLATES_DIR: /app/.cursor/skills/loading-h5-preview/templates
+      LOADING_PREVIEW_FALLBACK: ${LOADING_PREVIEW_FALLBACK:-0}
+    restart: unless-stopped
+
+  static:
+    build:
+      context: ./static
+    container_name: psd-artist-static
+    ports:
+      - "${STATIC_HOST_PORT:-8801}:80"
+    volumes:
+      - ./data/jobs:/data/jobs:ro
+    depends_on:
+      - portal
+    restart: unless-stopped

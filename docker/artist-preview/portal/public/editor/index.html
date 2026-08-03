@@ -1,0 +1,2498 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>图层编辑 · Artist Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --design-w: 2490;
+      --design-h: 1400;
+      --bg: #141416;
+      --chrome: #1c1c1f;
+      --panel: #1f1f23;
+      --elev: #26262b;
+      --line: #2e2e34;
+      --text: #f0eee8;
+      --muted: #8a8790;
+      --faint: #5c5963;
+      --accent: #e8a04a;
+      --info: #6ea8d8;
+      --font: 'Outfit', 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+      --mono: ui-monospace, 'IBM Plex Mono', Consolas, monospace;
+      --radius: 4px;
+    }
+    html { height: 100%; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100%;
+      min-height: 100dvh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 44px;
+      padding: 0 12px;
+      background: var(--chrome);
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+    .topbar-title strong {
+      font-size: 13px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chip {
+      font-size: 10px;
+      font-family: var(--mono);
+      color: var(--faint);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 1px 6px;
+      white-space: nowrap;
+    }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .topbar button, .view-menu summary {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--elev);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 6px 11px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .topbar button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .topbar button:hover, .view-menu summary:hover { background: #2e2e34; }
+    .topbar button.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: #1a1208;
+      font-weight: 600;
+    }
+    .topbar button.primary:hover { background: #f0b05e; }
+    .edit-status {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--mono);
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .edit-status.is-busy { color: var(--accent); }
+    .edit-status.is-error { color: #f07178; }
+    .edit-status.is-ok { color: #7fd99a; }
+
+    .topbar button.is-busy {
+      pointer-events: none;
+      opacity: 0.85;
+      border-color: rgba(232, 160, 74, 0.55);
+    }
+    .spin {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .task-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      z-index: 200;
+      min-width: 260px;
+      max-width: min(520px, 92vw);
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: rgba(22, 22, 26, 0.96);
+      border: 1px solid rgba(232, 160, 74, 0.45);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .task-toast.show { display: flex; }
+    .task-toast.is-error { border-color: rgba(240, 113, 120, 0.55); }
+    .task-toast.is-ok { border-color: rgba(127, 217, 154, 0.5); }
+    .task-toast .toast-msg { flex: 1; line-height: 1.35; }
+    .task-toast .toast-close {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .preview-qr-modal {
+      position: fixed; inset: 0; z-index: 300;
+      display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .preview-qr-modal[hidden] { display: none !important; }
+    .preview-qr-backdrop {
+      position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55);
+    }
+    .preview-qr-card {
+      position: relative; z-index: 1; width: min(360px, 94vw);
+      padding: 18px 18px 16px; border-radius: 14px;
+      background: #16161a; border: 1px solid rgba(232, 160, 74, 0.35);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    }
+    .preview-qr-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 12px;
+    }
+    .preview-qr-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+    .preview-qr-x {
+      border: 0; background: transparent; color: var(--muted);
+      font-size: 20px; cursor: pointer; line-height: 1;
+    }
+    .preview-qr-canvas {
+      display: flex; justify-content: center; align-items: center;
+      min-height: 220px; padding: 8px; background: #fff; border-radius: 10px;
+    }
+    .preview-qr-canvas img, .preview-qr-canvas canvas { display: block; }
+    .preview-qr-hint { margin: 12px 0 6px; font-size: 12px; color: var(--muted); }
+    .preview-qr-link {
+      display: block; font-size: 11px; word-break: break-all;
+      color: #e8a04a; line-height: 1.35; margin-bottom: 12px;
+    }
+    .preview-qr-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .preview-qr-actions .btn {
+      border: 1px solid var(--line); background: var(--elev); color: var(--text);
+      border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit;
+    }
+    .preview-qr-actions .btn.primary {
+      background: var(--accent); color: #1a1208; border-color: transparent;
+    }
+    .view-menu {
+      position: relative;
+    }
+    .view-menu summary {
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .view-menu summary::-webkit-details-marker { display: none; }
+    .view-menu[open] summary { border-color: rgba(232,160,74,.45); }
+    .view-pop {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      width: 240px;
+      padding: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .view-pop label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .view-pop label input { accent-color: var(--accent); }
+    #backPortal { color: var(--info); text-decoration: none; font-size: 12px; }
+    html.embed #serveHint,
+    html.embed #parserHint,
+    html.embed #jobHint { display: none !important; }
+
+    .app {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .board {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      grid-template-rows: 28px 1fr;
+      background: #101012;
+    }
+    .ruler-corner {
+      grid-column: 1;
+      grid-row: 1;
+      background: var(--chrome);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .ruler-x, .ruler-y {
+      display: block;
+      background: #161618;
+    }
+    .ruler-x {
+      grid-column: 2;
+      grid-row: 1;
+      width: 100%;
+      height: 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    .ruler-y {
+      grid-column: 1;
+      grid-row: 2;
+      width: 28px;
+      height: 100%;
+      border-right: 1px solid var(--line);
+    }
+    .board-viewport {
+      grid-column: 2;
+      grid-row: 2;
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .stage-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow: auto;
+      transform-style: preserve-3d;
+      background: #0c0c0e;
+    }
+    .fx-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 8;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .board-viewport.fx-on .fx-layer { opacity: 1; }
+    .fx-layer::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        440px circle at var(--mx, 50%) var(--my, 40%),
+        rgba(232, 160, 74, 0.1),
+        transparent 58%
+      );
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .board-viewport.fx-on.fx-hover .fx-layer::before { opacity: 1; }
+
+    /* scrollbars */
+    .inspector-tree,
+    .stage-wrap,
+    .view-pop {
+      scrollbar-width: thin;
+      scrollbar-color: #3a3a42 transparent;
+    }
+    .inspector-tree::-webkit-scrollbar,
+    .stage-wrap::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .inspector-tree::-webkit-scrollbar-track,
+    .stage-wrap::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .inspector-tree::-webkit-scrollbar-thumb,
+    .stage-wrap::-webkit-scrollbar-thumb {
+      background: #3a3a42;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .inspector-tree::-webkit-scrollbar-thumb:hover,
+    .stage-wrap::-webkit-scrollbar-thumb:hover {
+      background: #52525c;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .stage-wrap.pick-3d {
+      align-items: center;
+      perspective: min(100vw, 2400px);
+      perspective-origin: 50% 38%;
+      -webkit-perspective: min(100vw, 2400px);
+      -webkit-perspective-origin: 50% 38%;
+    }
+    .stage-wrap.pick-3d.pick-3d-grabbing { cursor: grabbing; }
+    .stage.pick-3d {
+      transform-style: preserve-3d;
+      transform-origin: 50% 42%;
+    }
+    #tilesRoot.pick-3d {
+      transform-style: preserve-3d;
+      isolation: auto;
+    }
+    .stage {
+      position: relative;
+      width: calc(var(--design-w) * 1px);
+      height: calc(var(--design-h) * 1px);
+      transform-origin: top center;
+      margin: 24px auto;
+      background-color: #121214;
+      background-image:
+        linear-gradient(45deg, #18181b 25%, transparent 25%),
+        linear-gradient(-45deg, #18181b 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #18181b 75%),
+        linear-gradient(-45deg, transparent 75%, #18181b 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+      box-shadow:
+        0 0 0 1px var(--line),
+        0 20px 60px rgba(0,0,0,.5);
+      border-radius: 2px;
+    }
+    .stage-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 90000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      background-image:
+        linear-gradient(to right, rgba(232, 160, 74, 0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(232, 160, 74, 0.07) 1px, transparent 1px),
+        linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+      background-size:
+        100px 100px,
+        100px 100px,
+        20px 20px,
+        20px 20px;
+      mix-blend-mode: screen;
+    }
+    .stage-grid.on { opacity: 1; }
+
+    .crosshair-x,
+    .crosshair-y {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    .board-viewport.fx-on.fx-hover .crosshair-x,
+    .board-viewport.fx-on.fx-hover .crosshair-y { opacity: 1; }
+    .crosshair-x {
+      left: 0;
+      right: 0;
+      height: 1px;
+      top: var(--my, 0px);
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(232, 160, 74, 0.55) 18%,
+        rgba(232, 160, 74, 0.55) 82%,
+        transparent
+      );
+      box-shadow: 0 0 10px rgba(232, 160, 74, 0.35);
+    }
+    .crosshair-y {
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      left: var(--mx, 0px);
+      background: linear-gradient(
+        180deg,
+        transparent,
+        rgba(232, 160, 74, 0.55) 18%,
+        rgba(232, 160, 74, 0.55) 82%,
+        transparent
+      );
+      box-shadow: 0 0 10px rgba(232, 160, 74, 0.35);
+    }
+    .cursor-hud {
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+      transform: translate(14px, 14px);
+      left: var(--mx, 0px);
+      top: var(--my, 0px);
+      padding: 5px 9px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: #f5e6c8;
+      background: rgba(20, 20, 24, 0.86);
+      border: 1px solid rgba(232, 160, 74, 0.38);
+      box-shadow:
+        0 6px 22px rgba(0, 0, 0, 0.5),
+        0 0 24px rgba(232, 160, 74, 0.14);
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+    }
+    .board-viewport.fx-on.fx-hover .cursor-hud { opacity: 1; }
+    .cursor-hud b {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    #tilesRoot { isolation: isolate; }
+    .stage .tile {
+      position: absolute;
+      display: block;
+      pointer-events: none;
+      image-rendering: auto;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .stage .tile.pick-3d-interactive {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .stage .tile.pick-3d-interactive:hover {
+      outline: 1px solid rgba(232, 160, 74, 0.7);
+      outline-offset: -1px;
+    }
+    .stage .tile.sel-outline {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+      /* 禁止抬 z-index，避免选中看起来像「改了叠序/图层」 */
+    }
+    .wire {
+      position: absolute;
+      border: 1px dashed rgba(232, 160, 74, .45);
+      pointer-events: none;
+      font-size: 10px;
+      color: rgba(240, 220, 180, .85);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      padding: 1px 2px;
+      z-index: 99999;
+    }
+    .wire.hidden { border-color: rgba(212,115,115,.45); color: rgba(255,180,180,.7); }
+
+    #clipRectOverlay, #marqueeRectOverlay {
+      position: absolute;
+      left: 0; top: 0; width: 0; height: 0;
+      pointer-events: none;
+      z-index: 100001;
+      box-sizing: border-box;
+      display: none;
+      border: 1.5px solid rgba(232, 160, 74, 0.75);
+      background: rgba(232, 160, 74, 0.05);
+    }
+    #marqueeRectOverlay {
+      border-color: rgba(110, 168, 216, 0.75);
+      background: rgba(110, 168, 216, 0.05);
+      z-index: 100002;
+    }
+    #clipRectOverlay.visible, #marqueeRectOverlay.visible { display: block; }
+    #clipRectLabel, #marqueeRectLabel {
+      position: absolute;
+      left: 6px; top: 6px;
+      font-size: 10px;
+      font-family: var(--mono);
+      color: var(--text);
+      background: rgba(20,20,22,.75);
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+
+    .inspector {
+      width: min(320px, 40vw);
+      flex-shrink: 0;
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .side-head {
+      margin: 0;
+      padding: 11px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .side-head .count {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      font-weight: 500;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .inspector-tools {
+      padding: 8px 10px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .tool-row {
+      display: flex;
+      gap: 6px;
+    }
+    .tool-row button {
+      flex: 1;
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--elev);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 5px 8px;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .tool-row button:hover { background: #2e2e34; }
+    .blend-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .blend-row label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11.5px;
+      cursor: pointer;
+    }
+    .blend-row input { accent-color: var(--accent); }
+
+    .tree-pane {
+      flex: 1 1 0;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-bottom: 1px solid var(--line);
+    }
+    .inspector-tree {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: auto;
+      font-size: 12px;
+    }
+
+    .prop-pane {
+      flex: 0 0 auto;
+      max-height: 42%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: #1a1a1e;
+    }
+    .prop-pane .side-head {
+      background: #1c1c20;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0 5px;
+      border-radius: 2px;
+      font-size: 10px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      line-height: 16px;
+    }
+    .badge.psd-hidden { color: #d47373; border-color: rgba(212,115,115,.35); }
+    .badge.full { color: #7cbc8a; border-color: rgba(124,188,138,.35); }
+    .badge.bg-mark {
+      color: var(--accent);
+      border-color: rgba(232,160,74,.45);
+    }
+
+    .prop-body {
+      overflow: auto;
+      padding: 10px 12px 14px;
+      font-size: 12px;
+      min-height: 88px;
+    }
+    .prop-body.empty {
+      color: var(--faint);
+      font-size: 12px;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      min-height: 88px;
+    }
+    .prop-grid {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 8px 10px;
+      margin: 0;
+      align-items: center;
+    }
+    .prop-grid dt {
+      color: var(--faint);
+      font-size: 11px;
+    }
+    .prop-grid dd {
+      margin: 0;
+      word-break: break-all;
+      font-size: 11px;
+      color: var(--text);
+    }
+    .prop-grid dd.mono { font-family: var(--mono); }
+    .prop-grid input[type='text'],
+    .prop-grid input[type='number'],
+    .prop-grid select {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--elev);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 4px 6px;
+      font: inherit;
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+    .prop-grid input[type='checkbox'] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+    }
+    .prop-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .prop-actions button {
+      flex: 1;
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--elev);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .prop-actions button.primary {
+      background: rgba(232, 160, 74, 0.2);
+      border-color: rgba(232, 160, 74, 0.45);
+      color: var(--accent);
+    }
+    .prop-title {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    .prop-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    /* —— 节点树：对齐 aiws layout-tree —— */
+    .inspector-tree.layout-tree {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: auto;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+    .layout-tree-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px 3px 0;
+      cursor: pointer;
+      color: var(--text);
+      white-space: nowrap;
+      user-select: none;
+      position: relative;
+      min-height: 26px;
+    }
+    .layout-tree-item:hover { background: #242428; }
+    .layout-tree-item.active {
+      background: rgba(232, 160, 74, 0.14);
+      color: #f0d0a0;
+    }
+    .layout-tree-item.layout-tree-draggable { cursor: grab; }
+    .layout-tree-item.layout-tree-draggable:active { cursor: grabbing; }
+    .layout-tree.layout-tree-dragging,
+    .layout-tree.layout-tree-dragging .layout-tree-item {
+      cursor: grabbing !important;
+      user-select: none;
+    }
+    .layout-tree-item.layout-dragging {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .layout-tree-item.drop-before::before,
+    .layout-tree-item.drop-after::after {
+      content: '';
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .layout-tree-item.drop-before::before { top: 0; }
+    .layout-tree-item.drop-after::after { bottom: 0; }
+    .layout-tree-item.drop-into {
+      outline: 1px solid var(--accent);
+      background: rgba(232, 160, 74, 0.12);
+    }
+    .layout-tree-item.inactive-node { opacity: 0.45; }
+    .layout-tree-twist {
+      width: 16px;
+      flex-shrink: 0;
+      text-align: center;
+      color: var(--faint);
+      font-size: 10px;
+    }
+    .layout-vis {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      margin: 0 4px 0 0;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+    .layout-tree-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .layout-tree-badge {
+      margin-left: 4px;
+      font-size: 10px;
+      color: var(--faint);
+      font-family: var(--mono);
+      flex-shrink: 0;
+    }
+    .muted { color: var(--faint); }
+    .hint { color: var(--muted); font-size: 12px; }
+    #boardLayoutHint, #pick3dHint { display: none; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">
+      <strong id="docTitle">加载中…</strong>
+      <span class="chip" id="docFormatBadge">PSD</span>
+      <span class="edit-status" id="editStatus"></span>
+    </div>
+    <div class="topbar-actions">
+      <a id="backPortal" href="../">← 稿件库</a>
+      <details class="view-menu">
+        <summary>视图</summary>
+        <div class="view-pop">
+          <label><input type="checkbox" id="toggleGrid" checked /> 网格</label>
+          <label><input type="checkbox" id="toggleCursorFx" checked /> 准星 / 坐标</label>
+          <label><input type="checkbox" id="toggleWire" /> 线框</label>
+          <label><input type="checkbox" id="toggleHidden" /> 线框含隐藏层</label>
+          <label id="clipRectLabelWrap"><input type="checkbox" id="toggleClipRect" /> 截剪区辅助</label>
+          <label><input type="checkbox" id="toggleMarqueeRect" /> 走马灯区辅助</label>
+          <label><input type="checkbox" id="toggleStackReverse" checked /> 反转叠序</label>
+          <label><input type="checkbox" id="togglePick3d" /> 3D 拾取</label>
+        </div>
+      </details>
+      <button type="button" id="btnMarkBg" title="标记 BgPlus 背景（不回写 PSD）">标为 BG</button>
+      <button type="button" id="btnLoadingPreview" title="生成 Loading H5 并打开预览">
+        <span class="spin" id="btnLoadingSpin" hidden aria-hidden="true"></span>
+        <span id="btnLoadingLabel">Loading 页预览</span>
+      </button>
+      <button type="button" id="btnLoadingQr" hidden title="公网二维码供手机扫码">手机扫码</button>
+      <button type="button" id="btnSaveEdit" class="primary" title="写入 scene-edit.json">保存</button>
+    </div>
+    <span id="serveHint" hidden></span>
+    <span id="parserHint" hidden></span>
+    <span id="jobHint" hidden></span>
+    <span id="boardLayoutHint" hidden></span>
+    <span id="pick3dHint" hidden></span>
+  </header>
+  <div id="taskToast" class="task-toast" role="status" aria-live="polite">
+    <span class="spin" id="taskToastSpin" aria-hidden="true"></span>
+    <span class="toast-msg" id="taskToastMsg">处理中…</span>
+    <button type="button" class="toast-close" id="taskToastClose" title="关闭">×</button>
+  </div>
+  <div class="app">
+    <div class="board">
+      <div class="ruler-corner" aria-hidden="true"></div>
+      <canvas class="ruler-x" id="rulerX" width="800" height="28" aria-hidden="true"></canvas>
+      <canvas class="ruler-y" id="rulerY" width="28" height="800" aria-hidden="true"></canvas>
+      <div class="board-viewport">
+        <div class="stage-wrap" id="stageWrap">
+          <div class="stage" id="stage" aria-label="源稿切图拼接">
+            <div class="stage-grid on" id="stageGrid" aria-hidden="true"></div>
+            <div id="tilesRoot"></div>
+            <div id="wireRoot" hidden></div>
+            <div id="clipRectOverlay" aria-hidden="true">
+              <span id="clipRectLabel"></span>
+            </div>
+            <div id="marqueeRectOverlay" aria-hidden="true">
+              <span id="marqueeRectLabel"></span>
+            </div>
+          </div>
+        </div>
+        <div class="fx-layer" id="fxLayer" aria-hidden="true">
+          <div class="crosshair-x" id="crosshairX"></div>
+          <div class="crosshair-y" id="crosshairY"></div>
+          <div class="cursor-hud" id="cursorHud">x <b>0</b> · y <b>0</b></div>
+        </div>
+      </div>
+    </div>
+    <aside class="inspector" id="inspector">
+      <div class="side-head">
+        <span>节点树</span>
+        <span class="count" id="treeCount">—</span>
+      </div>
+      <div class="inspector-tools">
+        <div class="blend-row">
+          <label><input type="radio" name="blendMode" value="normal" checked /> 混合：全部 normal</label>
+          <label><input type="radio" name="blendMode" value="psd" /> 混合：PSD 原值</label>
+        </div>
+        <div class="tool-row">
+          <button type="button" id="btnShowAll">全部显示</button>
+          <button type="button" id="btnPsdDefault">按 PSD</button>
+        </div>
+      </div>
+      <div class="tree-pane">
+        <div class="inspector-tree layout-tree" id="inspectorTree"></div>
+      </div>
+      <div class="prop-pane">
+        <div class="side-head"><span>Inspector</span></div>
+        <div class="prop-body empty" id="propBody">选中节点查看属性</div>
+      </div>
+    </aside>
+  </div>
+  <script src="../base-path.js"></script>
+  <script src="../vendor/qrcode.min.js"></script>
+  <script src="../preview-qr.js"></script>
+  <script src="./psd-tree-ui.js"></script>
+  <script>
+    (function () {
+      var qs = new URLSearchParams(location.search);
+      var JOB_ID = qs.get('job') || '';
+      var EMBED = qs.get('embed') === '1';
+      if (EMBED) {
+        document.documentElement.classList.add('embed');
+        var back = document.getElementById('backPortal');
+        if (back) back.hidden = true;
+      }
+      var bp = typeof window.__artistPreviewUrl === 'function'
+        ? window.__artistPreviewUrl
+        : function (p) { return p; };
+      var API_BASE = '';
+      var layersUrl = JOB_ID
+        ? bp('/api/jobs/' + encodeURIComponent(JOB_ID) + '/exports/layers.json')
+        : './layers.json';
+      var boardUrl = JOB_ID
+        ? bp('/api/jobs/' + encodeURIComponent(JOB_ID) + '/exports/board-layout.json')
+        : './board-layout.json';
+      var sceneEditUrl = JOB_ID
+        ? bp('/api/jobs/' + encodeURIComponent(JOB_ID) + '/scene-edit')
+        : null;
+      var tileUrlPrefix = JOB_ID
+        ? bp('/api/jobs/' + encodeURIComponent(JOB_ID) + '/exports/')
+        : '';
+      var sceneEdit = {
+        version: 1,
+        bgLayerId: null,
+        nodes: {},
+        groups: {},
+        treeOrder: [],
+        removedIds: [],
+      };
+      var selectedTileIndex = null;
+
+      function setEditStatus(t, kind) {
+        var el = document.getElementById('editStatus');
+        if (!el) return;
+        el.textContent = t || '';
+        el.classList.remove('is-busy', 'is-error', 'is-ok');
+        if (kind) el.classList.add('is-' + kind);
+      }
+
+      function showTaskToast(msg, opts) {
+        opts = opts || {};
+        var toast = document.getElementById('taskToast');
+        var msgEl = document.getElementById('taskToastMsg');
+        var spin = document.getElementById('taskToastSpin');
+        if (!toast || !msgEl) return;
+        msgEl.textContent = msg || '';
+        toast.classList.remove('is-error', 'is-ok');
+        if (opts.kind === 'error') toast.classList.add('is-error');
+        if (opts.kind === 'ok') toast.classList.add('is-ok');
+        if (spin) spin.hidden = !!opts.hideSpin;
+        toast.classList.add('show');
+        if (opts.autoHideMs) {
+          clearTimeout(showTaskToast._timer);
+          showTaskToast._timer = setTimeout(function () {
+            hideTaskToast();
+          }, opts.autoHideMs);
+        }
+      }
+
+      function hideTaskToast() {
+        var toast = document.getElementById('taskToast');
+        if (toast) toast.classList.remove('show', 'is-error', 'is-ok');
+      }
+
+      var toastClose = document.getElementById('taskToastClose');
+      if (toastClose) {
+        toastClose.addEventListener('click', function () { hideTaskToast(); });
+      }
+
+      function setLoadingPreviewBusy(busy, label) {
+        var btn = document.getElementById('btnLoadingPreview');
+        var spin = document.getElementById('btnLoadingSpin');
+        var lab = document.getElementById('btnLoadingLabel');
+        if (!btn) return;
+        btn.disabled = !!busy;
+        btn.classList.toggle('is-busy', !!busy);
+        btn.setAttribute('aria-busy', busy ? 'true' : 'false');
+        if (spin) spin.hidden = !busy;
+        if (lab) lab.textContent = label || (busy ? '生成中…' : 'Loading 页预览');
+      }
+
+      function jobHintEl() {
+        var el = document.getElementById('jobHint');
+        if (el) {
+          el.textContent = JOB_ID ? 'job ' + JOB_ID.slice(0, 8) + '…' : '（本地 ./layers.json）';
+        }
+      }
+      jobHintEl();
+
+      var blendCss = {
+        normal: 'normal',
+        multiply: 'multiply',
+        screen: 'screen',
+        overlay: 'overlay',
+        darken: 'darken',
+        lighten: 'lighten',
+        'color-dodge': 'color-dodge',
+        'color-burn': 'color-burn',
+        'hard-light': 'hard-light',
+        'soft-light': 'soft-light',
+        difference: 'difference',
+        exclusion: 'exclusion',
+        hue: 'hue',
+        saturation: 'saturation',
+        color: 'color',
+        luminosity: 'luminosity',
+        'pass through': 'normal'
+      };
+
+      var stage = document.getElementById('stage');
+      var stageWrap = document.getElementById('stageWrap');
+      var tilesRoot = document.getElementById('tilesRoot');
+      var wireRoot = document.getElementById('wireRoot');
+      var toggleWire = document.getElementById('toggleWire');
+      var toggleHidden = document.getElementById('toggleHidden');
+      var inspectorTree = document.getElementById('inspectorTree');
+      var DW = 2490;
+      var DH = 1400;
+
+      var docRef = null;
+      var boardLayoutRef = null;
+      var imgs = [];
+      /** 叶节点自身眼睛（不含祖先） */
+      var leafVisible = [];
+      /** 组路径 → 自身眼睛 */
+      var groupVisible = {};
+      var psdTreeCtrl = null;
+      var maxTileIndexForZ = 0;
+      var clipRectOverlay = document.getElementById('clipRectOverlay');
+      var clipRectLabel = document.getElementById('clipRectLabel');
+      var marqueeRectOverlay = document.getElementById('marqueeRectOverlay');
+      var marqueeRectLabel = document.getElementById('marqueeRectLabel');
+      var toggleClipRect = document.getElementById('toggleClipRect');
+      var toggleMarqueeRect = document.getElementById('toggleMarqueeRect');
+      var toggleStackReverse = document.getElementById('toggleStackReverse');
+      var togglePick3d = document.getElementById('togglePick3d');
+      var pick3dHint = document.getElementById('pick3dHint');
+      var boardLayoutHint = document.getElementById('boardLayoutHint');
+
+      var PICK3D_Z_STEP = 7;
+      var pick3dCam = { panX: 0, panY: 0, zoom: 1, persp: null, tiltDeg: 52 };
+      var pick3dDrag = null;
+
+      function resetPick3dCamera() {
+        pick3dCam.panX = 0;
+        pick3dCam.panY = 0;
+        pick3dCam.zoom = 1;
+        pick3dCam.persp = null;
+        pick3dCam.tiltDeg = 52;
+      }
+
+      function defaultPick3dPerspective() {
+        return Math.min(window.innerWidth, 2400);
+      }
+
+      function isPick3dOn() {
+        return !!(togglePick3d && togglePick3d.checked);
+      }
+
+      function applyPick3dTileTransforms() {
+        if (!docRef) return;
+        var on = isPick3dOn();
+        var maxI = maxTileIndexForZ;
+        var rev = toggleStackReverse.checked;
+        (docRef.tiles || []).forEach(function (t, i) {
+          var img = imgs[i];
+          if (!img || !t.file) return;
+          if (on) {
+            var stackZ = rev ? maxI - i : i;
+            img.style.transform = 'translateZ(' + stackZ * PICK3D_Z_STEP + 'px)';
+            img.classList.add('pick-3d-interactive');
+          } else {
+            img.style.transform = '';
+            img.classList.remove('pick-3d-interactive');
+          }
+        });
+        if (pick3dHint) {
+          pick3dHint.textContent = on
+            ? '镜头：中键/Alt+空白拖移 · 滚轮缩放 · Ctrl+滚轮透视 · Shift+滚轮俯仰 · Home 重置 · 点击图块→Inspector · ` / Esc'
+            : '';
+        }
+      }
+
+      function fitScale() {
+        var maxW = Math.max(80, window.innerWidth - 400);
+        var maxH = Math.max(80, window.innerHeight - 56 - 28);
+        var s0 = Math.min(maxW / DW, maxH / DH, 1);
+        var pick = isPick3dOn();
+        if (pick) s0 *= 0.78;
+        var s = pick ? s0 * pick3dCam.zoom : s0;
+        stage.style.transformOrigin = pick ? '50% 42%' : 'top center';
+        if (pick) {
+          stage.style.transform = 'scale(' + s + ') rotateX(' + pick3dCam.tiltDeg + 'deg)';
+        } else {
+          stage.style.transform = 'scale(' + s + ')';
+        }
+        if (stageWrap) {
+          stageWrap.classList.toggle('pick-3d', pick);
+          if (pick) {
+            var persp = pick3dCam.persp != null ? pick3dCam.persp : defaultPick3dPerspective();
+            stageWrap.style.perspective = persp + 'px';
+            stageWrap.style.webkitPerspective = persp + 'px';
+            stageWrap.style.transform =
+              'translate3d(' + pick3dCam.panX + 'px,' + pick3dCam.panY + 'px,0)';
+          } else {
+            stageWrap.style.perspective = '';
+            stageWrap.style.webkitPerspective = '';
+            stageWrap.style.transform = '';
+          }
+        }
+        stage.classList.toggle('pick-3d', pick);
+        tilesRoot.classList.toggle('pick-3d', pick);
+        applyPick3dTileTransforms();
+        paintRulers(s);
+      }
+
+      var rulerX = document.getElementById('rulerX');
+      var rulerY = document.getElementById('rulerY');
+      var lastScale = 1;
+
+      function niceStep(pxPerUnit) {
+        // aim ~50px between major ticks
+        var raw = 50 / Math.max(pxPerUnit, 0.0001);
+        var pow = Math.pow(10, Math.floor(Math.log10(raw)));
+        var n = raw / pow;
+        var nice = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
+        return nice * pow;
+      }
+
+      function paintRulers(scale, playX, playY) {
+        lastScale = scale || lastScale || 1;
+        if (!rulerX || !rulerY || !stageWrap) return;
+        var sx = stageWrap.clientWidth;
+        var sy = stageWrap.clientHeight;
+        var dpr = window.devicePixelRatio || 1;
+        rulerX.width = Math.max(1, Math.floor(sx * dpr));
+        rulerX.height = Math.floor(28 * dpr);
+        rulerX.style.width = sx + 'px';
+        rulerY.width = Math.floor(28 * dpr);
+        rulerY.height = Math.max(1, Math.floor(sy * dpr));
+        rulerY.style.height = sy + 'px';
+
+        var ctxX = rulerX.getContext('2d');
+        var ctxY = rulerY.getContext('2d');
+        ctxX.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctxY.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctxX.clearRect(0, 0, sx, 28);
+        ctxY.clearRect(0, 0, 28, sy);
+        ctxX.fillStyle = '#161618';
+        ctxY.fillStyle = '#161618';
+        ctxX.fillRect(0, 0, sx, 28);
+        ctxY.fillRect(0, 0, 28, sy);
+
+        var scrollL = stageWrap.scrollLeft;
+        var scrollT = stageWrap.scrollTop;
+        var stageRect = stage.getBoundingClientRect();
+        var wrapRect = stageWrap.getBoundingClientRect();
+        var originX = stageRect.left - wrapRect.left + scrollL;
+        var originY = stageRect.top - wrapRect.top + scrollT;
+
+        var step = niceStep(lastScale);
+        var majorEvery = step >= 100 ? 1 : 2;
+        ctxX.strokeStyle = '#3a3a42';
+        ctxY.strokeStyle = '#3a3a42';
+        ctxX.fillStyle = '#8a8790';
+        ctxY.fillStyle = '#8a8790';
+        ctxX.font = '10px Outfit, sans-serif';
+        ctxY.font = '10px Outfit, sans-serif';
+        ctxX.textBaseline = 'top';
+
+        var startU = Math.floor((-originX / lastScale) / step) * step;
+        var endU = Math.ceil(((-originX + sx) / lastScale) / step) * step;
+        for (var u = startU; u <= endU; u += step) {
+          var x = originX + u * lastScale;
+          if (x < -1 || x > sx + 1) continue;
+          var major = Math.abs(u / step) % majorEvery < 1e-6;
+          ctxX.beginPath();
+          ctxX.moveTo(x + 0.5, major ? 10 : 18);
+          ctxX.lineTo(x + 0.5, 28);
+          ctxX.stroke();
+          if (major) ctxX.fillText(String(Math.round(u)), x + 3, 3);
+        }
+
+        var startV = Math.floor((-originY / lastScale) / step) * step;
+        var endV = Math.ceil(((-originY + sy) / lastScale) / step) * step;
+        for (var v = startV; v <= endV; v += step) {
+          var y = originY + v * lastScale;
+          if (y < -1 || y > sy + 1) continue;
+          var maj = Math.abs(v / step) % majorEvery < 1e-6;
+          ctxY.beginPath();
+          ctxY.moveTo(maj ? 10 : 18, y + 0.5);
+          ctxY.lineTo(28, y + 0.5);
+          ctxY.stroke();
+          if (maj) {
+            ctxY.save();
+            ctxY.translate(3, y + 3);
+            ctxY.rotate(-Math.PI / 2);
+            ctxY.fillText(String(Math.round(v)), 0, 0);
+            ctxY.restore();
+          }
+        }
+
+        if (playX != null && playY != null) {
+          ctxX.strokeStyle = 'rgba(232,160,74,0.95)';
+          ctxX.fillStyle = 'rgba(232,160,74,0.95)';
+          ctxX.beginPath();
+          ctxX.moveTo(playX + 0.5, 0);
+          ctxX.lineTo(playX + 0.5, 28);
+          ctxX.stroke();
+          ctxX.beginPath();
+          ctxX.moveTo(playX - 4, 0);
+          ctxX.lineTo(playX + 4, 0);
+          ctxX.lineTo(playX, 5);
+          ctxX.closePath();
+          ctxX.fill();
+
+          ctxY.strokeStyle = 'rgba(232,160,74,0.95)';
+          ctxY.fillStyle = 'rgba(232,160,74,0.95)';
+          ctxY.beginPath();
+          ctxY.moveTo(0, playY + 0.5);
+          ctxY.lineTo(28, playY + 0.5);
+          ctxY.stroke();
+          ctxY.beginPath();
+          ctxY.moveTo(0, playY - 4);
+          ctxY.lineTo(0, playY + 4);
+          ctxY.lineTo(5, playY);
+          ctxY.closePath();
+          ctxY.fill();
+        }
+      }
+
+      function setDesignSize(w, h) {
+        DW = w;
+        DH = h;
+        document.documentElement.style.setProperty('--design-w', String(w));
+        document.documentElement.style.setProperty('--design-h', String(h));
+        stage.style.width = w + 'px';
+        stage.style.height = h + 'px';
+      }
+
+      function blendFromPsd() {
+        var r = document.querySelector('input[name="blendMode"]:checked');
+        return r && r.value === 'psd';
+      }
+
+      function applyBlendToAll() {
+        var fromPsd = blendFromPsd();
+        if (!docRef) return;
+        (docRef.tiles || []).forEach(function (t, i) {
+          var img = imgs[i];
+          if (!img) return;
+          var mode = fromPsd ? editBlend(i) : 'normal';
+          img.style.mixBlendMode = blendCss[mode] || 'normal';
+        });
+      }
+
+      function applyStackZ() {
+        if (!docRef) return;
+        var maxI = maxTileIndexForZ;
+        var rev = toggleStackReverse.checked;
+        (docRef.tiles || []).forEach(function (t, i) {
+          var img = imgs[i];
+          if (!img || !t.file) return;
+          var z = rev ? maxI - i : i;
+          img.style.zIndex = String(z);
+        });
+        applyPick3dTileTransforms();
+      }
+
+      function computeMaxTileIndex() {
+        var m = 0;
+        (docRef.tiles || []).forEach(function (t, i) {
+          if (t.file) m = Math.max(m, i);
+        });
+        return m;
+      }
+
+      function tileKey(t, i) {
+        return t.id || ('tile_' + String((t.index != null ? t.index : i) + 1).padStart(5, '0'));
+      }
+
+      function parentPathsOf(pathStr) {
+        var parts = String(pathStr || '')
+          .split('/')
+          .map(function (x) { return x.trim(); })
+          .filter(Boolean);
+        var out = [];
+        var acc = '';
+        for (var i = 0; i < parts.length - 1; i++) {
+          acc = acc ? acc + '/' + parts[i] : parts[i];
+          out.push(acc);
+        }
+        return out;
+      }
+
+      function buildGroupHiddenMap(groups) {
+        var m = {};
+        (groups || []).forEach(function (g) {
+          if (g.path) m[g.path] = !!g.hidden;
+        });
+        return m;
+      }
+
+      /** PSD 源：图层自身 hidden 或父组 hidden */
+      function isTileEffectivelyHidden(tile, groupHidden) {
+        if (!tile) return true;
+        if (tile.effectiveHidden != null) return !!tile.effectiveHidden;
+        if (tile.hidden) return true;
+        var parents = parentPathsOf(tile.path);
+        for (var i = 0; i < parents.length; i++) {
+          if (groupHidden[parents[i]]) return true;
+        }
+        return false;
+      }
+
+      function isGroupEffectivelyVisible(groupPath) {
+        if (!groupPath) return true;
+        var parts = String(groupPath).split('/').filter(Boolean);
+        var acc = '';
+        for (var i = 0; i < parts.length; i++) {
+          acc = acc ? acc + '/' + parts[i] : parts[i];
+          if (groupVisible[acc] === false) return false;
+        }
+        return true;
+      }
+
+      /** 画布有效可见 = 叶眼睛 ∧ 全部祖先组眼睛（祖先取自当前可拖拽树） */
+      function isEffectivelyVisible(i) {
+        if (!leafVisible[i]) return false;
+        var t = docRef && docRef.tiles[i];
+        if (!t) return false;
+        var parents = leafAncestorGroupPaths(i);
+        for (var p = 0; p < parents.length; p++) {
+          if (groupVisible[parents[p]] === false) return false;
+        }
+        return true;
+      }
+
+      function leafAncestorGroupPaths(i) {
+        if (psdTreeCtrl && psdTreeCtrl.getTree()) {
+          var paths = [];
+          var tree = psdTreeCtrl.getTree();
+          function find(n, trail) {
+            if (!n) return false;
+            if (n.type === 'leaf' && n.tileIndex === i) {
+              for (var k = 0; k < trail.length; k++) paths.push(trail[k]);
+              return true;
+            }
+            var nextTrail = trail;
+            if (n.type === 'group' && n.path) nextTrail = trail.concat([n.path]);
+            var kids = n.children || [];
+            for (var c = 0; c < kids.length; c++) {
+              if (find(kids[c], nextTrail)) return true;
+            }
+            return false;
+          }
+          if (find(tree, [])) return paths;
+        }
+        return parentPathsOf((docRef.tiles[i] && docRef.tiles[i].path) || '');
+      }
+
+      function nodeOverride(i) {
+        if (!docRef || !docRef.tiles[i]) return null;
+        var key = tileKey(docRef.tiles[i], i);
+        return (sceneEdit.nodes && sceneEdit.nodes[key]) || null;
+      }
+
+      function displayName(i) {
+        var t = docRef.tiles[i];
+        var ov = nodeOverride(i);
+        if (ov && ov.name) return ov.name;
+        return leafNameFromPath(t.path) || t.path || ('layer ' + i);
+      }
+
+      function editLeft(i) {
+        var t = docRef.tiles[i];
+        var ov = nodeOverride(i);
+        if (ov && ov.left != null) return Number(ov.left);
+        return t.left;
+      }
+
+      function editTop(i) {
+        var t = docRef.tiles[i];
+        var ov = nodeOverride(i);
+        if (ov && ov.top != null) return Number(ov.top);
+        return t.top;
+      }
+
+      function editOpacity(i) {
+        var t = docRef.tiles[i];
+        var ov = nodeOverride(i);
+        var raw = ov && ov.opacity != null ? ov.opacity : t.opacity;
+        return tileCssOpacityValue(raw);
+      }
+
+      function editBlend(i) {
+        var t = docRef.tiles[i];
+        var ov = nodeOverride(i);
+        if (ov && ov.blendMode) return ov.blendMode;
+        return t.blendMode || 'normal';
+      }
+
+      function tileCssOpacityValue(o) {
+        if (o == null) return 1;
+        o = Number(o);
+        if (o > 1 && o <= 100) return o / 100;
+        if (o > 100) return o / 255;
+        return o;
+      }
+
+      function tileCssOpacity(t) {
+        if (!t || !t.file || !docRef) return 1;
+        var mode = docRef.mode || '';
+        if (mode === 'photopea-tiles' || mode.indexOf('photopea-tiles') === 0) return 1;
+        if (docRef.parser === 'photopea') return 1;
+        return tileCssOpacityValue(t.opacity);
+      }
+
+      function applyTileTransform(i) {
+        var img = imgs[i];
+        var t = docRef && docRef.tiles[i];
+        if (!img || !t || !t.file) return;
+        img.style.left = editLeft(i) + 'px';
+        img.style.top = editTop(i) + 'px';
+        img.style.width = t.width + 'px';
+        img.style.height = t.height + 'px';
+        if (isEffectivelyVisible(i)) {
+          img.style.visibility = 'visible';
+          var mode = docRef.mode || '';
+          var skipOp =
+            mode === 'photopea-tiles' ||
+            (mode && mode.indexOf('photopea-tiles') === 0) ||
+            docRef.parser === 'photopea';
+          img.style.opacity = String(skipOp ? 1 : editOpacity(i));
+        } else {
+          img.style.visibility = 'hidden';
+        }
+      }
+
+      function applyVisibility(i) {
+        applyTileTransform(i);
+      }
+
+      function applyAllVisibility() {
+        if (!docRef) return;
+        (docRef.tiles || []).forEach(function (t, i) {
+          if (!t.file) return;
+          applyVisibility(i);
+        });
+        syncTreeEyeUi();
+      }
+
+      function syncTreeEyeUi() {
+        if (psdTreeCtrl) psdTreeCtrl.syncEyes();
+      }
+
+      function initVisibilityFromPsd() {
+        var gh = (docRef && docRef.groupHiddenMap) || {};
+        groupVisible = {};
+        Object.keys(gh).forEach(function (p) {
+          groupVisible[p] = !gh[p];
+        });
+        (docRef.tiles || []).forEach(function (t) {
+          parentPathsOf(t.path).forEach(function (p) {
+            if (groupVisible[p] == null) groupVisible[p] = true;
+          });
+        });
+        leafVisible = new Array((docRef.tiles || []).length);
+        (docRef.tiles || []).forEach(function (t, i) {
+          if (!t.file) return;
+          leafVisible[i] = !t.hidden;
+        });
+      }
+
+      function fillPropPane(idx) {
+        var body = document.getElementById('propBody');
+        if (!body) return;
+        if (idx == null || !docRef || !docRef.tiles[idx] || !docRef.tiles[idx].file) {
+          body.className = 'prop-body empty';
+          body.textContent = '选中节点查看 / 编辑属性';
+          return;
+        }
+        var t = docRef.tiles[idx];
+        var full = t.width >= DW * 0.95 && t.height >= DH * 0.95;
+        var psdHid = isTileEffectivelyHidden(t, docRef.groupHiddenMap || {});
+        var zv = toggleStackReverse.checked ? maxTileIndexForZ - idx : idx;
+        var key = tileKey(t, idx);
+        var isBg = sceneEdit && sceneEdit.bgLayerId === key;
+        var badges = '';
+        if (psdHid) badges += '<span class="badge psd-hidden">PSD 隐藏</span>';
+        if (full) badges += '<span class="badge full">全幅</span>';
+        if (isBg) badges += '<span class="badge bg-mark">BG</span>';
+
+        var blendOpts = Object.keys(blendCss)
+          .filter(function (k) { return k !== 'pass through'; })
+          .map(function (k) {
+            var sel = editBlend(idx) === k ? ' selected' : '';
+            return '<option value="' + k + '"' + sel + '>' + k + '</option>';
+          })
+          .join('');
+
+        body.className = 'prop-body';
+        body.innerHTML =
+          '<div class="prop-title">' + escapeHtml(displayName(idx)) + '</div>' +
+          (badges ? '<div class="prop-badges">' + badges + '</div>' : '') +
+          '<dl class="prop-grid">' +
+          '<dt>索引</dt><dd class="mono">#' + idx + '</dd>' +
+          '<dt>ID</dt><dd class="mono">' + escapeHtml(key) + '</dd>' +
+          '<dt>路径</dt><dd class="mono">' + escapeHtml(t.path || '—') + '</dd>' +
+          '<dt>资源</dt><dd class="mono">' + escapeHtml(t.file || '—') + '</dd>' +
+          '<dt>尺寸</dt><dd class="mono">' + t.width + ' × ' + t.height + '</dd>' +
+          '<dt>显示名</dt><dd><input type="text" id="propName" value="' +
+            escapeHtml(displayName(idx)) + '" /></dd>' +
+          '<dt>可见</dt><dd><input type="checkbox" id="propVisible"' +
+            (leafVisible[idx] ? ' checked' : '') + ' /></dd>' +
+          '<dt>X</dt><dd><input type="number" id="propLeft" value="' + editLeft(idx) + '" /></dd>' +
+          '<dt>Y</dt><dd><input type="number" id="propTop" value="' + editTop(idx) + '" /></dd>' +
+          '<dt>不透明度</dt><dd><input type="number" id="propOpacity" min="0" max="1" step="0.01" value="' +
+            editOpacity(idx) + '" /></dd>' +
+          '<dt>混合</dt><dd><select id="propBlend">' + blendOpts + '</select></dd>' +
+          '<dt>Z</dt><dd class="mono">' + zv + '</dd>' +
+          '<dt>有效显隐</dt><dd>' + (isEffectivelyVisible(idx) ? '显示' : '隐藏') + '</dd>' +
+          '</dl>' +
+          '<div class="prop-actions">' +
+          '<button type="button" id="propMarkBg"' + (isBg ? ' class="primary"' : '') + '>' +
+          (isBg ? '已是 BG' : '标为 BG') + '</button>' +
+          '</div>';
+
+        function patchNode(partial) {
+          var nodes = sceneEdit.nodes || (sceneEdit.nodes = {});
+          nodes[key] = Object.assign({}, nodes[key] || {}, partial, {
+            order: t.index != null ? t.index : idx,
+          });
+          setEditStatus('未保存 · ' + key);
+          applyVisibility(idx);
+          syncTreeEyeUi();
+        }
+
+        var nameEl = document.getElementById('propName');
+        if (nameEl) {
+          nameEl.addEventListener('change', function () {
+            patchNode({ name: nameEl.value });
+            syncTreeEyeUi();
+            var h = body.querySelector('.prop-title');
+            if (h) h.textContent = nameEl.value;
+          });
+        }
+        var visEl = document.getElementById('propVisible');
+        if (visEl) {
+          visEl.addEventListener('change', function () {
+            leafVisible[idx] = visEl.checked;
+            patchNode({ visible: !!visEl.checked });
+            fillPropPane(idx);
+          });
+        }
+        var leftEl = document.getElementById('propLeft');
+        if (leftEl) {
+          leftEl.addEventListener('change', function () {
+            patchNode({ left: Number(leftEl.value) });
+          });
+        }
+        var topEl = document.getElementById('propTop');
+        if (topEl) {
+          topEl.addEventListener('change', function () {
+            patchNode({ top: Number(topEl.value) });
+          });
+        }
+        var opEl = document.getElementById('propOpacity');
+        if (opEl) {
+          opEl.addEventListener('change', function () {
+            patchNode({ opacity: Number(opEl.value) });
+          });
+        }
+        var blEl = document.getElementById('propBlend');
+        if (blEl) {
+          blEl.addEventListener('change', function () {
+            patchNode({ blendMode: blEl.value });
+            applyBlendToAll();
+          });
+        }
+        var bgBtn = document.getElementById('propMarkBg');
+        if (bgBtn) {
+          bgBtn.addEventListener('click', function () {
+            sceneEdit.bgLayerId = key;
+            setEditStatus('未保存 · bg=' + key);
+            fillPropPane(idx);
+          });
+        }
+      }
+
+      function setRowActive(idx) {
+        selectedTileIndex = idx;
+        if (psdTreeCtrl) psdTreeCtrl.highlightLeaf(idx);
+        imgs.forEach(function (im, j) {
+          if (im) im.classList.toggle('sel-outline', j === idx);
+        });
+        fillPropPane(idx);
+      }
+
+      function revealInspectorRowForTile(idx) {
+        if (psdTreeCtrl) psdTreeCtrl.highlightLeaf(idx);
+      }
+
+      function leafNameFromPath(path) {
+        var p = String(path || '');
+        var i = p.lastIndexOf('/');
+        return i >= 0 ? p.slice(i + 1) : p;
+      }
+
+      function ensureGroupVisibleKeys(tree) {
+        function walk(n) {
+          if (!n) return;
+          if (n.type === 'group' && n.path && groupVisible[n.path] == null) {
+            groupVisible[n.path] = true;
+          }
+          (n.children || []).forEach(walk);
+        }
+        walk(tree);
+      }
+
+      function serializeLayoutTree(tree) {
+        function mapNode(n) {
+          if (n.type === 'root') {
+            return { type: 'root', children: (n.children || []).map(mapNode) };
+          }
+          if (n.type === 'group') {
+            return {
+              type: 'group',
+              id: n.id,
+              name: n.name,
+              path: n.path,
+              children: (n.children || []).map(mapNode),
+            };
+          }
+          return {
+            type: 'leaf',
+            id: n.id,
+            name: n.name,
+            tileIndex: n.tileIndex,
+            path: n.path,
+            children: [],
+          };
+        }
+        return mapNode(tree);
+      }
+
+      function hydrateLayoutTree(snap) {
+        if (!snap || !window.PsdTreeUi) return null;
+        function mapNode(n) {
+          if (!n) return null;
+          if (n.type === 'root' || (!n.type && n.children)) {
+            return {
+              type: 'root',
+              id: 'root',
+              name: '',
+              path: '',
+              children: (n.children || []).map(mapNode).filter(Boolean),
+            };
+          }
+          if (n.type === 'group') {
+            return {
+              type: 'group',
+              id: n.id || ('g:' + n.path),
+              name: n.name,
+              path: n.path,
+              children: (n.children || []).map(mapNode).filter(Boolean),
+            };
+          }
+          if (n.type === 'leaf') {
+            var ti = n.tileIndex;
+            if (ti == null || !docRef.tiles[ti] || !docRef.tiles[ti].file) return null;
+            return {
+              type: 'leaf',
+              id: n.id || tileKey(docRef.tiles[ti], ti),
+              name: n.name || leafNameFromPath(docRef.tiles[ti].path),
+              tileIndex: ti,
+              path: n.path || docRef.tiles[ti].path,
+              children: [],
+            };
+          }
+          return null;
+        }
+        return mapNode(snap);
+      }
+
+      function buildInspector() {
+        fillPropPane(null);
+        var countEl = document.getElementById('treeCount');
+        if (countEl && docRef) {
+          var n = (docRef.tiles || []).filter(function (t) { return t && t.file; }).length;
+          countEl.textContent = n + ' 层';
+        }
+        if (!window.PsdTreeUi) {
+          inspectorTree.innerHTML = '<div class="muted" style="padding:8px">缺少 psd-tree-ui.js</div>';
+          return;
+        }
+        if (!psdTreeCtrl) {
+          psdTreeCtrl = window.PsdTreeUi.create({
+            rootEl: inspectorTree,
+            displayName: function (node) {
+              if (node.type === 'leaf') return displayName(node.tileIndex);
+              return node.name || node.path || node.id;
+            },
+            isEyeChecked: function (node) {
+              if (node.type === 'leaf') return !!leafVisible[node.tileIndex];
+              if (node.type === 'group') return groupVisible[node.path] !== false;
+              return true;
+            },
+            isNodeInactive: function (node) {
+              if (node.type === 'leaf') return !isEffectivelyVisible(node.tileIndex);
+              if (node.type === 'group') return !isGroupEffectivelyVisible(node.path);
+              return false;
+            },
+            isNodeActive: function (node) {
+              return node.type === 'leaf' && node.tileIndex === selectedTileIndex;
+            },
+            onSelect: function (node) {
+              if (node.type === 'leaf') setRowActive(node.tileIndex);
+            },
+            onToggleEye: function (node, on) {
+              if (node.type === 'leaf') {
+                var i = node.tileIndex;
+                leafVisible[i] = on;
+                var t = docRef.tiles[i];
+                var key = tileKey(t, i);
+                var nodes = sceneEdit.nodes || (sceneEdit.nodes = {});
+                nodes[key] = Object.assign({}, nodes[key] || {}, {
+                  visible: !!on,
+                  name: (nodes[key] && nodes[key].name) || displayName(i),
+                  order: t.index != null ? t.index : i,
+                });
+                applyVisibility(i);
+                syncTreeEyeUi();
+                setEditStatus('未保存 · ' + key);
+                if (selectedTileIndex === i) fillPropPane(i);
+                return;
+              }
+              if (node.type === 'group' && node.path) {
+                groupVisible[node.path] = on;
+                var groups = sceneEdit.groups || (sceneEdit.groups = {});
+                groups[node.path] = Object.assign({}, groups[node.path] || {}, {
+                  visible: !!on,
+                });
+                applyAllVisibility();
+                setEditStatus('未保存 · group ' + node.path);
+              }
+            },
+            onTreeMutated: function (tree) {
+              sceneEdit.layoutTree = serializeLayoutTree(tree);
+              ensureGroupVisibleKeys(tree);
+              applyAllVisibility();
+              setEditStatus('未保存 · 树结构已改');
+            },
+            onDragStatus: function (msg) {
+              setEditStatus(msg);
+            },
+          });
+        }
+
+        var tree = null;
+        if (sceneEdit.layoutTree) tree = hydrateLayoutTree(sceneEdit.layoutTree);
+        if (!tree) {
+          tree = window.PsdTreeUi.buildFromTiles(docRef.tiles, tileKey);
+        }
+        ensureGroupVisibleKeys(tree);
+        psdTreeCtrl.setTree(tree, false);
+        syncTreeEyeUi();
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function applyBoardLayout(bl) {
+        var stackHint = '';
+        if (docRef && docRef.stacking && docRef.stacking.tileOrder) {
+          stackHint = 'tiles 序: ' + docRef.stacking.tileOrder + ' · ';
+        }
+        marqueeRectOverlay.classList.remove('visible');
+
+        var hasClip =
+          bl &&
+          bl.clip &&
+          bl.clip.rect &&
+          bl.clip.rect.width > 0 &&
+          bl.clip.rect.height > 0;
+        var mqR = bl && bl.marquee && bl.marquee.rect;
+        var hasMq = mqR && mqR.width > 0 && mqR.height > 0;
+
+        if (!bl) {
+          boardLayoutHint.textContent =
+            stackHint + '无 board-layout.json，可 npm run infer-psd:board-layout';
+          clipRectOverlay.classList.remove('visible');
+          return;
+        }
+        if (!hasClip && !hasMq) {
+          boardLayoutHint.textContent = stackHint + 'board-layout 无有效 clip / marquee';
+          clipRectOverlay.classList.remove('visible');
+          return;
+        }
+
+        if (hasClip) {
+          var r = bl.clip.rect;
+          clipRectOverlay.style.left = r.left + 'px';
+          clipRectOverlay.style.top = r.top + 'px';
+          clipRectOverlay.style.width = r.width + 'px';
+          clipRectOverlay.style.height = r.height + 'px';
+          clipRectLabel.textContent =
+            'clip ' + r.width + '×' + r.height + ' @(' + r.left + ',' + r.top + ') · ' + (bl.clip.source || '') +
+            ' · ambient ' + ((bl.ambient && bl.ambient.tileIndices && bl.ambient.tileIndices.length) || 0);
+          clipRectOverlay.classList.toggle('visible', toggleClipRect.checked);
+        } else {
+          clipRectOverlay.classList.remove('visible');
+        }
+
+        if (hasMq) {
+          marqueeRectOverlay.style.left = mqR.left + 'px';
+          marqueeRectOverlay.style.top = mqR.top + 'px';
+          marqueeRectOverlay.style.width = mqR.width + 'px';
+          marqueeRectOverlay.style.height = mqR.height + 'px';
+          var nMq = (bl.marquee.tileIndices && bl.marquee.tileIndices.length) || 0;
+          marqueeRectLabel.textContent =
+            'marquee ' + mqR.width + '×' + mqR.height + ' @(' + mqR.left + ',' + mqR.top + ') · ' +
+            (bl.marquee.source || '') + ' · tiles ' + nMq;
+          marqueeRectOverlay.classList.toggle('visible', toggleMarqueeRect.checked);
+        }
+
+        var hintParts = [];
+        if (!hasClip) hintParts.push('无 clip');
+        if (!hasMq) hintParts.push('无 marquee');
+        var suffix = hintParts.length ? ' · ' + hintParts.join('，') : '';
+        boardLayoutHint.textContent =
+          stackHint +
+          'layout: ' +
+          (bl.method || '') +
+          suffix +
+          ' · ' +
+          (bl.notes || '').slice(0, 56) +
+          (bl.notes && bl.notes.length > 56 ? '…' : '');
+      }
+
+      toggleClipRect.addEventListener('change', function () {
+        clipRectOverlay.classList.toggle('visible', toggleClipRect.checked);
+      });
+      toggleMarqueeRect.addEventListener('change', function () {
+        marqueeRectOverlay.classList.toggle('visible', toggleMarqueeRect.checked);
+      });
+
+      toggleStackReverse.addEventListener('change', function () {
+        applyStackZ();
+        buildInspector();
+      });
+
+      if (togglePick3d) {
+        togglePick3d.addEventListener('change', function () {
+          if (!togglePick3d.checked) {
+            resetPick3dCamera();
+            pick3dDrag = null;
+            if (stageWrap) stageWrap.classList.remove('pick-3d-grabbing');
+          }
+          fitScale();
+        });
+      }
+
+      if (stageWrap) {
+        stageWrap.addEventListener(
+          'wheel',
+          function (ev) {
+            if (!isPick3dOn()) return;
+            if (!stageWrap.contains(ev.target)) return;
+            if (ev.ctrlKey) {
+              ev.preventDefault();
+              var cur = pick3dCam.persp != null ? pick3dCam.persp : defaultPick3dPerspective();
+              cur *= Math.exp(ev.deltaY * 0.0018);
+              cur = Math.max(320, Math.min(12000, cur));
+              pick3dCam.persp = cur;
+              fitScale();
+            } else if (ev.shiftKey) {
+              ev.preventDefault();
+              pick3dCam.tiltDeg += ev.deltaY * 0.08;
+              pick3dCam.tiltDeg = Math.max(18, Math.min(88, pick3dCam.tiltDeg));
+              fitScale();
+            } else {
+              ev.preventDefault();
+              pick3dCam.zoom *= Math.exp(-ev.deltaY * 0.0015);
+              pick3dCam.zoom = Math.max(0.12, Math.min(8, pick3dCam.zoom));
+              fitScale();
+            }
+          },
+          { passive: false },
+        );
+
+        stageWrap.addEventListener('pointerdown', function (ev) {
+          if (!isPick3dOn()) return;
+          var onTile = ev.target.closest && ev.target.closest('img.tile');
+          var middle = ev.button === 1;
+          var altBlank = ev.button === 0 && ev.altKey && !onTile;
+          if (!middle && !altBlank) return;
+          ev.preventDefault();
+          pick3dDrag = {
+            pointerId: ev.pointerId,
+            startX: ev.clientX,
+            startY: ev.clientY,
+            ox: pick3dCam.panX,
+            oy: pick3dCam.panY,
+          };
+          stageWrap.classList.add('pick-3d-grabbing');
+          try {
+            stageWrap.setPointerCapture(ev.pointerId);
+          } catch (e) {}
+        });
+
+        stageWrap.addEventListener('pointermove', function (ev) {
+          if (!pick3dDrag || ev.pointerId !== pick3dDrag.pointerId) return;
+          pick3dCam.panX = pick3dDrag.ox + (ev.clientX - pick3dDrag.startX);
+          pick3dCam.panY = pick3dDrag.oy + (ev.clientY - pick3dDrag.startY);
+          fitScale();
+        });
+
+        function endPick3dPan(ev) {
+          if (!pick3dDrag || ev.pointerId !== pick3dDrag.pointerId) return;
+          try {
+            stageWrap.releasePointerCapture(ev.pointerId);
+          } catch (e2) {}
+          stageWrap.classList.remove('pick-3d-grabbing');
+          pick3dDrag = null;
+        }
+        stageWrap.addEventListener('pointerup', endPick3dPan);
+        stageWrap.addEventListener('pointercancel', endPick3dPan);
+      }
+
+      tilesRoot.addEventListener('click', function (ev) {
+        if (!isPick3dOn()) return;
+        var img = ev.target && ev.target.closest && ev.target.closest('img.tile');
+        if (!img || !tilesRoot.contains(img)) return;
+        var idx = parseInt(img.dataset.tileIndex, 10);
+        if (isNaN(idx)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        setRowActive(idx);
+        revealInspectorRowForTile(idx);
+      });
+
+      window.addEventListener(
+        'keydown',
+        function (ev) {
+          var tag = ev.target && ev.target.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return;
+          if (ev.key === '`' || ev.code === 'Backquote') {
+            if (ev.repeat || !togglePick3d) return;
+            ev.preventDefault();
+            togglePick3d.checked = !togglePick3d.checked;
+            togglePick3d.dispatchEvent(new Event('change'));
+            return;
+          }
+          if (ev.key === 'Escape' && isPick3dOn()) {
+            ev.preventDefault();
+            togglePick3d.checked = false;
+            togglePick3d.dispatchEvent(new Event('change'));
+            return;
+          }
+          if (ev.key === 'Home' && isPick3dOn()) {
+            ev.preventDefault();
+            resetPick3dCamera();
+            fitScale();
+            return;
+          }
+        },
+        true,
+      );
+
+      document.querySelectorAll('input[name="blendMode"]').forEach(function (el) {
+        el.addEventListener('change', applyBlendToAll);
+      });
+      document.getElementById('btnShowAll').addEventListener('click', function () {
+        Object.keys(groupVisible).forEach(function (p) {
+          groupVisible[p] = true;
+        });
+        for (var i = 0; i < docRef.tiles.length; i++) {
+          if (!docRef.tiles[i] || !docRef.tiles[i].file) continue;
+          leafVisible[i] = true;
+        }
+        applyAllVisibility();
+        setEditStatus('未保存 · 全部显示');
+      });
+      document.getElementById('btnPsdDefault').addEventListener('click', function () {
+        initVisibilityFromPsd();
+        applyAllVisibility();
+        setEditStatus('未保存 · 按 PSD');
+        if (selectedTileIndex != null) fillPropPane(selectedTileIndex);
+      });
+
+      function applySceneEditToUserShow() {
+        if (!docRef || !docRef.tiles) return;
+        if (sceneEdit.groups) {
+          Object.keys(sceneEdit.groups).forEach(function (gp) {
+            var g = sceneEdit.groups[gp];
+            if (g && typeof g.visible === 'boolean') groupVisible[gp] = g.visible;
+          });
+        }
+        (docRef.tiles || []).forEach(function (t, i) {
+          if (!t.file) return;
+          var key = tileKey(t, i);
+          var node = sceneEdit.nodes && sceneEdit.nodes[key];
+          if (node && typeof node.visible === 'boolean') leafVisible[i] = node.visible;
+        });
+        applyAllVisibility();
+        (docRef.tiles || []).forEach(function (t, i) {
+          if (t.file) applyTileTransform(i);
+        });
+        applyBlendToAll();
+      }
+
+      function collectSceneEditFromUi() {
+        var nodes = Object.assign({}, sceneEdit.nodes || {});
+        (docRef.tiles || []).forEach(function (t, i) {
+          if (!t.file) return;
+          var key = tileKey(t, i);
+          nodes[key] = Object.assign({}, nodes[key] || {}, {
+            visible: !!leafVisible[i],
+            name: (nodes[key] && nodes[key].name) || displayName(i),
+            order: t.index != null ? t.index : i,
+          });
+        });
+        var groups = Object.assign({}, sceneEdit.groups || {});
+        Object.keys(groupVisible).forEach(function (gp) {
+          groups[gp] = Object.assign({}, groups[gp] || {}, {
+            visible: groupVisible[gp] !== false,
+          });
+        });
+        return {
+          version: 1,
+          bgLayerId: sceneEdit.bgLayerId || null,
+          nodes: nodes,
+          groups: groups,
+          layoutTree:
+            psdTreeCtrl && psdTreeCtrl.getTree()
+              ? serializeLayoutTree(psdTreeCtrl.getTree())
+              : sceneEdit.layoutTree || null,
+          treeOrder: sceneEdit.treeOrder || [],
+          removedIds: sceneEdit.removedIds || [],
+        };
+      }
+
+      function saveSceneEdit() {
+        if (!sceneEditUrl || !docRef) {
+          setEditStatus('无 job，跳过保存');
+          return Promise.resolve();
+        }
+        var body = collectSceneEditFromUi();
+        setEditStatus('saving…');
+        return fetch(sceneEditUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error('save ' + r.status);
+            return r.json();
+          })
+          .then(function (doc) {
+            sceneEdit = doc;
+            setEditStatus('saved · bg=' + (doc.bgLayerId || 'null'));
+          })
+          .catch(function (e) {
+            setEditStatus('save fail: ' + e.message);
+          });
+      }
+
+      var btnSave = document.getElementById('btnSaveEdit');
+      if (btnSave) btnSave.addEventListener('click', function () { saveSceneEdit(); });
+      var btnBg = document.getElementById('btnMarkBg');
+      if (btnBg) {
+        btnBg.addEventListener('click', function () {
+          if (selectedTileIndex == null || !docRef || !docRef.tiles[selectedTileIndex]) {
+            setEditStatus('先在画布/树点选一层');
+            return;
+          }
+          var t = docRef.tiles[selectedTileIndex];
+          var key = tileKey(t, selectedTileIndex);
+          sceneEdit.bgLayerId = key;
+          setEditStatus('BG → ' + key);
+          saveSceneEdit();
+        });
+      }
+      function openPreviewUrl(pathUrl) {
+        var href = pathUrl;
+        if (typeof window.__artistPreviewAbsoluteUrl === 'function') {
+          var abs = window.__artistPreviewAbsoluteUrl(pathUrl);
+          if (abs && /^https?:/.test(abs)) href = abs;
+        }
+        try {
+          var a = document.createElement('a');
+          a.href = href;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          return true;
+        } catch (e) {
+          try {
+            return !!window.open(href, '_blank', 'noopener');
+          } catch (e2) {
+            return false;
+          }
+        }
+      }
+
+      function showLoadingQr(pathUrl) {
+        var qrBtn = document.getElementById('btnLoadingQr');
+        if (qrBtn) {
+          qrBtn.hidden = false;
+          qrBtn.dataset.url = pathUrl;
+        }
+        if (typeof window.showPreviewQr === 'function') {
+          return window.showPreviewQr(pathUrl, 'Loading 手机预览');
+        }
+        return Promise.resolve();
+      }
+
+      var btnLoadingQr = document.getElementById('btnLoadingQr');
+      if (btnLoadingQr) {
+        btnLoadingQr.addEventListener('click', function () {
+          var url = btnLoadingQr.dataset.url || bp('/preview/' + encodeURIComponent(JOB_ID) + '/loading/');
+          showLoadingQr(url);
+        });
+      }
+
+      var btnLoading = document.getElementById('btnLoadingPreview');
+      if (btnLoading) {
+        var loadingPoll = null;
+        var loadingBusy = false;
+        btnLoading.addEventListener('click', function () {
+          if (loadingBusy) return;
+          if (!JOB_ID) {
+            setEditStatus('无 job，无法预览', 'error');
+            showTaskToast('当前页没有 job id，请从稿件库打开编辑器', {
+              kind: 'error',
+              hideSpin: true,
+              autoHideMs: 4000,
+            });
+            return;
+          }
+          loadingBusy = true;
+          setLoadingPreviewBusy(true, '检查中…');
+          setEditStatus('Loading 检查缓存…', 'busy');
+          showTaskToast('检查 Loading 预览缓存…');
+          if (loadingPoll) {
+            clearInterval(loadingPoll);
+            loadingPoll = null;
+          }
+          var pathUrl = bp('/preview/' + encodeURIComponent(JOB_ID) + '/loading/');
+          fetch(bp('/api/jobs/' + encodeURIComponent(JOB_ID) + '/loading-preview'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: true }),
+          })
+            .then(function (r) {
+              return r.json().then(function (body) {
+                if (!r.ok) throw new Error(body.error || r.statusText);
+                return body;
+              });
+            })
+            .then(function (started) {
+              if (started.status === 'ready' || started.cached) {
+                loadingBusy = false;
+                setLoadingPreviewBusy(false);
+                setEditStatus(started.cached ? 'Loading 缓存' : 'Loading 就绪', 'ok');
+                var opened = openPreviewUrl(pathUrl);
+                showLoadingQr(pathUrl);
+                showTaskToast(
+                  opened
+                    ? 'Loading 已就绪：可扫码手机预览'
+                    : '预览已就绪，请扫码或允许弹窗',
+                  {
+                    kind: 'ok',
+                    hideSpin: true,
+                    autoHideMs: 4000,
+                  },
+                );
+                return;
+              }
+              setLoadingPreviewBusy(true, '生成中…');
+              setEditStatus('Loading 生成中…', 'busy');
+              showTaskToast('正在生成 Loading H5，请稍候…');
+              var pollOnce = function () {
+                return fetch(bp('/api/jobs/' + encodeURIComponent(JOB_ID) + '/loading-preview'))
+                  .then(function (r) { return r.json(); })
+                  .then(function (st) {
+                    if (st.status === 'ready') {
+                      if (loadingPoll) clearInterval(loadingPoll);
+                      loadingPoll = null;
+                      loadingBusy = false;
+                      setLoadingPreviewBusy(false);
+                      setEditStatus('Loading 就绪', 'ok');
+                      var opened = openPreviewUrl(pathUrl);
+                      showLoadingQr(pathUrl);
+                      showTaskToast(
+                        opened
+                          ? 'Loading 已就绪：可扫码手机预览'
+                          : '预览已就绪，请扫码或允许弹窗',
+                        {
+                          kind: 'ok',
+                          hideSpin: true,
+                          autoHideMs: 4000,
+                        },
+                      );
+                    } else if (st.status === 'error') {
+                      if (loadingPoll) clearInterval(loadingPoll);
+                      loadingPoll = null;
+                      loadingBusy = false;
+                      setLoadingPreviewBusy(false);
+                      var err = st.error || 'failed';
+                      setEditStatus('Loading 失败', 'error');
+                      showTaskToast('生成失败：' + err, {
+                        kind: 'error',
+                        hideSpin: true,
+                        autoHideMs: 8000,
+                      });
+                    } else {
+                      var phase = st.status || 'running';
+                      setLoadingPreviewBusy(true, phase === 'queued' ? '排队中…' : '生成中…');
+                      setEditStatus('Loading ' + phase + '…', 'busy');
+                      showTaskToast(
+                        phase === 'queued'
+                          ? '已入队，等待开始…'
+                          : '正在生成 Loading H5…',
+                      );
+                    }
+                  });
+              };
+              pollOnce().catch(function (e) {
+                loadingBusy = false;
+                setLoadingPreviewBusy(false);
+                setEditStatus('Loading poll 失败', 'error');
+                showTaskToast('轮询失败：' + e.message, {
+                  kind: 'error',
+                  hideSpin: true,
+                  autoHideMs: 6000,
+                });
+              });
+              loadingPoll = setInterval(function () {
+                pollOnce().catch(function (e) {
+                  if (loadingPoll) clearInterval(loadingPoll);
+                  loadingPoll = null;
+                  loadingBusy = false;
+                  setLoadingPreviewBusy(false);
+                  setEditStatus('Loading poll 失败', 'error');
+                  showTaskToast('轮询失败：' + e.message, {
+                    kind: 'error',
+                    hideSpin: true,
+                    autoHideMs: 6000,
+                  });
+                });
+              }, 2000);
+            })
+            .catch(function (e) {
+              loadingBusy = false;
+              setLoadingPreviewBusy(false);
+              setEditStatus('Loading 预览失败', 'error');
+              showTaskToast('无法启动：' + e.message, {
+                kind: 'error',
+                hideSpin: true,
+                autoHideMs: 8000,
+              });
+            });
+        });
+      }
+
+      Promise.all([
+        fetch(layersUrl).then(function (r) {
+          if (!r.ok) throw new Error('layers ' + r.status);
+          return r.json();
+        }),
+        fetch(boardUrl)
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .catch(function () { return null; }),
+        sceneEditUrl
+          ? fetch(sceneEditUrl)
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .catch(function () { return null; })
+          : Promise.resolve(null),
+      ])
+        .then(function (pair) {
+          var doc = pair[0];
+          var bl = pair[1];
+          if (pair[2]) sceneEdit = pair[2];
+          docRef = doc;
+          boardLayoutRef = bl;
+          docRef.groupHiddenMap = buildGroupHiddenMap(doc.groups);
+
+          (function applyDocMeta(d) {
+            var path = (d.source || d.file || '').replace(/\\/g, '/');
+            var base = path.split('/').pop() || 'layers.json';
+            var fmt = (d.sourceFormat || '').toLowerCase();
+            if (!fmt) {
+              fmt = base.toLowerCase().endsWith('.psb') ? 'psb' : 'psd';
+            }
+            var parser = d.parser || (fmt === 'psb' ? '@webtoon/psd' : 'ag-psd');
+            if (d.mode && String(d.mode).indexOf('photopea') === 0) parser = 'photopea';
+            var serve = fmt === 'psb' ? 'serve-psb:h5' : 'serve-psd:h5';
+            var infer = fmt === 'psb' ? 'infer-psb:board-layout' : 'infer-psd:board-layout';
+            document.title = base + ' · ' + fmt.toUpperCase() + ' 切图预览';
+            var titleEl = document.getElementById('docTitle');
+            var badgeEl = document.getElementById('docFormatBadge');
+            var serveEl = document.getElementById('serveHint');
+            var parserEl = document.getElementById('parserHint');
+            if (titleEl) titleEl.textContent = base;
+            if (badgeEl) {
+              var badge = fmt.toUpperCase() + ' · ' + parser;
+              if (d.structureLayerCount != null) badge += ' · ' + d.structureLayerCount + ' 结构层';
+              else if (d.tileCount != null) badge += ' · ' + d.tileCount + ' PNG';
+              badgeEl.textContent = badge;
+            }
+            if (serveEl) {
+              var serveCmd = parser === 'photopea' ? 'serve-psb:photopea-h5' : serve;
+              serveEl.innerHTML = '<code>npm run ' + serveCmd + '</code> → 471' + (parser === 'photopea' ? '5' : '3');
+            }
+            if (parserEl) parserEl.textContent = path ? path : '';
+            var clipWrap = document.getElementById('clipRectLabelWrap');
+            if (clipWrap) {
+              clipWrap.title = '需先 npm run ' + infer + ' 生成 board-layout.json';
+            }
+          })(doc);
+
+          if (doc.width && doc.height) setDesignSize(doc.width, doc.height);
+
+          imgs = [];
+          tilesRoot.innerHTML = '';
+          maxTileIndexForZ = computeMaxTileIndex();
+          initVisibilityFromPsd();
+
+          var isPhotopea = doc.parser === 'photopea' || (doc.mode && String(doc.mode).indexOf('photopea') === 0);
+
+          (doc.tiles || []).forEach(function (t, i) {
+            if (!t.file) return;
+
+            var img = document.createElement('img');
+            img.className = 'tile';
+            img.dataset.tileIndex = String(i);
+            img.src = tileUrlPrefix + t.file.split('/').map(function (s) { return encodeURIComponent(s); }).join('/');
+            img.alt = t.path || '';
+            img.style.position = 'absolute';
+            img.style.mixBlendMode = 'normal';
+            tilesRoot.appendChild(img);
+            imgs[i] = img;
+            applyTileTransform(i);
+          });
+
+          applyStackZ();
+          applyBlendToAll();
+          buildInspector();
+          applySceneEditToUserShow();
+          if (sceneEdit.bgLayerId) {
+            setEditStatus('bg=' + sceneEdit.bgLayerId);
+          }
+          if (isPhotopea) {
+            var effHid = (doc.tiles || []).filter(function (t) {
+              return isTileEffectivelyHidden(t, docRef.groupHiddenMap || {});
+            }).length;
+            boardLayoutHint.textContent =
+              (doc.stacking && doc.stacking.tileOrder ? 'tiles 序: ' + doc.stacking.tileOrder + ' · ' : '') +
+              'PSD 可见性（含父组）：默认隐藏 ' +
+              effHid +
+              ' 层 · 侧栏「按 PSD」';
+          }
+          applyBoardLayout(bl);
+          fitScale();
+
+          function renderWires() {
+            wireRoot.innerHTML = '';
+            var showHid = toggleHidden.checked;
+            (doc.tiles || []).forEach(function (t, ti) {
+              if (!t.width || !t.height) return;
+              if (!t.file && !isPhotopea) return;
+              var psdHid = isTileEffectivelyHidden(t, docRef.groupHiddenMap || {});
+              if (psdHid && !showHid) return;
+              var d = document.createElement('div');
+              d.className = 'wire' + (psdHid ? ' hidden' : '');
+              d.style.left = (t.file ? editLeft(ti) : t.left) + 'px';
+              d.style.top = (t.file ? editTop(ti) : t.top) + 'px';
+              d.style.width = t.width + 'px';
+              d.style.height = t.height + 'px';
+              d.style.zIndex = String(200000 + (t.index != null ? t.index : 0));
+              d.textContent = (t.index != null ? '#' + t.index + ' ' : '') + (t.path || '');
+              wireRoot.appendChild(d);
+            });
+          }
+
+          toggleWire.addEventListener('change', function () {
+            wireRoot.hidden = !toggleWire.checked;
+            if (toggleWire.checked) renderWires();
+          });
+          toggleHidden.addEventListener('change', function () {
+            if (toggleWire.checked) renderWires();
+          });
+        })
+        .catch(function (e) {
+          console.error(e);
+          tilesRoot.innerHTML = '<p style="padding:16px;color:#c66">无法加载 layers.json</p>';
+        });
+
+      window.addEventListener('resize', fitScale);
+      if (stageWrap) {
+        stageWrap.addEventListener('scroll', function () {
+          paintRulers(lastScale);
+        });
+
+        var toggleGrid = document.getElementById('toggleGrid');
+        var toggleCursorFx = document.getElementById('toggleCursorFx');
+        var stageGrid = document.getElementById('stageGrid');
+        var cursorHud = document.getElementById('cursorHud');
+        var boardViewport = stageWrap.parentElement;
+
+        function syncFxFlags() {
+          if (stageGrid) stageGrid.classList.toggle('on', !!(toggleGrid && toggleGrid.checked));
+          if (boardViewport) {
+            boardViewport.classList.toggle('fx-on', !!(toggleCursorFx && toggleCursorFx.checked));
+          }
+        }
+        if (toggleGrid) toggleGrid.addEventListener('change', syncFxFlags);
+        if (toggleCursorFx) toggleCursorFx.addEventListener('change', syncFxFlags);
+        syncFxFlags();
+
+        stageWrap.addEventListener('mousemove', function (ev) {
+          if (!toggleCursorFx || !toggleCursorFx.checked || !boardViewport) return;
+          var rect = boardViewport.getBoundingClientRect();
+          var mx = ev.clientX - rect.left;
+          var my = ev.clientY - rect.top;
+          boardViewport.style.setProperty('--mx', mx + 'px');
+          boardViewport.style.setProperty('--my', my + 'px');
+          boardViewport.classList.add('fx-hover');
+
+          var stageRect = stage.getBoundingClientRect();
+          var dx = (ev.clientX - stageRect.left) / Math.max(lastScale, 0.0001);
+          var dy = (ev.clientY - stageRect.top) / Math.max(lastScale, 0.0001);
+          if (cursorHud) {
+            var inside =
+              ev.clientX >= stageRect.left &&
+              ev.clientX <= stageRect.right &&
+              ev.clientY >= stageRect.top &&
+              ev.clientY <= stageRect.bottom;
+            cursorHud.innerHTML = inside
+              ? 'x <b>' + Math.round(dx) + '</b> · y <b>' + Math.round(dy) + '</b>'
+              : '<span style="color:#8a8790">canvas</span>';
+          }
+          paintRulers(lastScale, mx, my);
+        });
+        stageWrap.addEventListener('mouseleave', function () {
+          if (boardViewport) boardViewport.classList.remove('fx-hover');
+          paintRulers(lastScale);
+        });
+      }
+      fitScale();
+    })();
+  </script>
+</body>
+</html>

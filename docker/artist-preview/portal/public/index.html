@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>图层工作室 · Artist Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css?v=11" />
+</head>
+<body class="portal-home">
+  <header class="chrome">
+    <div class="chrome-left">
+      <div class="mark" aria-hidden="true"></div>
+      <nav class="crumbs" aria-label="breadcrumb">
+        <span class="crumb">Artist Preview</span>
+        <span class="sep">/</span>
+        <span class="crumb muted">稿件库</span>
+      </nav>
+    </div>
+    <div class="chrome-actions">
+      <button id="refreshBtn" type="button" class="ghost">刷新</button>
+      <label class="btn primary file-btn" for="file">
+        导入 PSD
+        <input id="file" type="file" accept=".psd,.psb,image/vnd.adobe.photoshop" hidden />
+      </label>
+    </div>
+  </header>
+
+  <div class="home-shell" id="drop">
+    <aside class="home-rail">
+      <div class="rail-head">
+        <h2>稿件</h2>
+        <span class="rail-meta" id="health">…</span>
+      </div>
+      <div id="jobs" class="jobs">暂无作业</div>
+    </aside>
+
+    <main class="home-main">
+      <div class="home-hero" id="stagePlaceholder">
+        <p class="stage-title" id="stageTitle">导入或选择稿件</p>
+        <p class="hint" id="stageHint">
+          解析完成后会<strong>整页进入图层编辑器</strong>（不再套窗口）。也可把 PSD 拖到本页任意处上传。
+        </p>
+        <div id="current" class="current empty" hidden></div>
+        <div class="actions home-actions" id="currentActions" hidden>
+          <a id="editorLink" class="btn primary" href="#">打开图层编辑器</a>
+          <button id="parseBtn" type="button" class="ghost">重新解析</button>
+          <a id="psdLink" class="btn ghost" href="#" target="_blank" rel="noreferrer">下载源稿</a>
+          <a id="previewLink" class="btn ghost" href="#" target="_blank" rel="noreferrer">产物预览</a>
+          <button id="loadingPreviewBtn" type="button" class="ghost" title="生成 Loading H5 并打开预览">
+            <span class="spin" id="loadingPreviewSpin" hidden aria-hidden="true"></span>
+            <span id="loadingPreviewLabel">Loading 页预览</span>
+          </button>
+          <a id="loadingPreviewLink" class="btn ghost" href="#" target="_blank" rel="noreferrer" hidden>
+            打开 Loading
+          </a>
+          <button id="loadingQrBtn" type="button" class="ghost" hidden title="生成公网链接二维码供手机扫码">
+            手机扫码
+          </button>
+          <button id="convertBtn" type="button" class="ghost" title="M2">转 Cocos</button>
+        </div>
+      </div>
+      <details class="log-fold home-log">
+        <summary>日志</summary>
+        <pre id="logs" class="log"></pre>
+        <pre id="status" class="log"></pre>
+      </details>
+    </main>
+  </div>
+
+  <span id="crumbJob" hidden></span>
+  <span id="propsBadge" hidden></span>
+  <div id="taskToast" class="task-toast" role="status" aria-live="polite">
+    <span class="spin" id="taskToastSpin" aria-hidden="true"></span>
+    <span class="toast-msg" id="taskToastMsg">处理中…</span>
+    <button type="button" class="toast-close" id="taskToastClose" title="关闭">×</button>
+  </div>
+  <script src="base-path.js"></script>
+  <script src="vendor/qrcode.min.js"></script>
+  <script src="preview-qr.js"></script>
+  <script src="app.js?v=11"></script>
+</body>
+</html>

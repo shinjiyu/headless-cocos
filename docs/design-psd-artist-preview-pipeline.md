@@ -204,8 +204,11 @@ GET    /api/jobs/:id/scene-edit
 PUT    /api/jobs/:id/scene-edit       保存树/节点调整（不写 PSD）
 POST   /api/jobs/:id/parse            触发/重跑解析（若上传后异步）
 POST   /api/jobs/:id/convert          转 Cocos（读 edit + 原 PSD）
+POST   /api/jobs/:id/loading-preview  排队 Cursor CLI → Loading H5
+GET    /api/jobs/:id/loading-preview  状态 / previewUrl
 GET    /api/jobs/:id/logs
-GET    /preview/:id/                  web-mobile
+GET    /preview/:id/                  web-mobile（M2）
+GET    /preview/:id/loading/          纯 H5 Splash（无 Cocos）
 GET    /editor/:id/                   图层预览编辑页（可同域 SPA）
 ```
 
@@ -213,7 +216,22 @@ GET    /editor/:id/                   图层预览编辑页（可同域 SPA）
 
 `uploaded` → `parsing` → `edit_ready` → `queued` → `splitting` → `assembling` → `ready` | `failed`
 
-（废弃默认路径上的 `photopea_ready` 语义；旧 job 可映射为 `edit_ready`。）
+Loading 预览旁路：`edit_ready` →（按钮）`loading_preview` → `loading_preview_ready`（不阻塞 M2）
+
+---
+
+## 7.1 Loading H5 + Cursor CLI（Docker）
+
+| 项 | 约定 |
+|----|------|
+| 触发 | 门户 / 编辑器「Loading 页预览」 |
+| 执行 | portal 容器内 Cursor Agent CLI（`CURSOR_API_KEY`） |
+| Skill | 仓库 `docker/artist-preview/.cursor/skills/loading-h5-preview/` |
+| 产出 | `jobs/{id}/loading-h5/` |
+| 预览 | `/preview/{id}/loading/` |
+| 降级 | `LOADING_PREVIEW_FALLBACK=1` 时确定性 `build-loading-h5.mjs` |
+
+对齐 AIWS：单飞队列、服务端生成 previewUrl、不依赖 Creator 端口。
 
 ---
 
@@ -235,6 +253,7 @@ GET    /editor/:id/                   图层预览编辑页（可同域 SPA）
 | M0 | 上传 + job 落盘 | ✅ |
 | M1 | Photopea 嵌入（实验） | ✅ 完成；**主路径将让位于 M1.5** |
 | **M1.5** | **解析 → 图层树预览编辑 + scene-edit 落盘（不写回 PSD）** | ✅ `docker/artist-preview` |
+| **Loading H5** | 按钮 → Docker Cursor CLI → 纯 H5 Splash | ✅ |
 | M2 | 按 scene-edit 转 Cocos / BgPlus 产物 | 待 M1.5 |
 | M3 | 进度/演示/清理测试 job | |
 | M4 | 无头旁路、压缩开关 | 可选 |
