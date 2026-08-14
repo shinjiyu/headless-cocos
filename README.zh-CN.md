@@ -125,9 +125,9 @@ cd headless-cocos
 ### 本地运行（mini）
 
 ```powershell
-node spike/bootstrap.mjs --out D:\tempWorkspace\my-game
+node spike/bootstrap.mjs --out <GAME>
 $env:PACKER = "mini"
-$env:PROJECT = "D:\tempWorkspace\my-game"
+$env:PROJECT = "<GAME>"
 node spike/preview-mirror.mjs
 ```
 

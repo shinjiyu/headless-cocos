@@ -45,8 +45,8 @@ https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-de
 git clone https://github.com/shinjiyu/headless-cocos.git
 cd headless-cocos
 # unzip headless-runtime-3.8.8 into runtime/3.8.8/  — see docs/runtime-kit.md
-node spike/bootstrap.mjs --out /path/to/my-game
-PACKER=mini PROJECT=/path/to/my-game node spike/preview-mirror.mjs
+node spike/bootstrap.mjs --out <GAME>
+PACKER=mini PROJECT=<GAME> node spike/preview-mirror.mjs
 ```
 
 ---
@@ -148,9 +148,9 @@ Details: [Runtime kit](./docs/runtime-kit.md)
 ### Run (mini mode)
 
 ```powershell
-node spike/bootstrap.mjs --out D:\tempWorkspace\my-game
+node spike/bootstrap.mjs --out <GAME>
 $env:PACKER = "mini"
-$env:PROJECT = "D:\tempWorkspace\my-game"
+$env:PROJECT = "<GAME>"
 node spike/preview-mirror.mjs
 ```
 

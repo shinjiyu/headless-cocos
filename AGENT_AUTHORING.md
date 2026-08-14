@@ -7,8 +7,8 @@
 
 https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_AUTHORING.md
 
-工程 = 用户工作区里的 Cocos 工程（`PROJECT`，不要默认成 `D:\tempWorkspace\my-game`）。  
-预览：`http://127.0.0.1:<PORT>/`（SETUP 里实际用的端口）。CLI 在预览栈仓库根（`STACK`）下跑。
+工程 = 当前 Cocos 工程根（环境变量 `PROJECT` / SETUP 算出的 `GAME`）。  
+预览 = SETUP 实际打出来的 `http://127.0.0.1:<PORT>/`。CLI 在预览栈根（`STACK`）下跑。
 
 ## 总原则
 
@@ -103,19 +103,19 @@ https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-de
 预览已开：
 
 ```
-GET  http://127.0.0.1:7460/__viewweaver
-POST http://127.0.0.1:7460/__viewweaver
-     { "prefab": "HeroCard" }
-     { "prefab": "assets/prefabs/HeroCard.prefab" }
+GET  http://127.0.0.1:<PORT>/__viewweaver
+POST http://127.0.0.1:<PORT>/__viewweaver
+     { "prefab": "<Prefab名>" }
+     { "prefab": "assets/prefabs/<Prefab名>.prefab" }
      { "all": true }
 ```
 
-或 CLI（在 headless-cocos 仓库根）：
+或 CLI（在 `STACK` 根）：
 
 ```powershell
-node spike/viewweaver-host.mjs --project D:\tempWorkspace\my-game --status
-node spike/viewweaver-host.mjs --project D:\tempWorkspace\my-game HeroCard
-node spike/viewweaver-host.mjs --project D:\tempWorkspace\my-game --all
+node spike/viewweaver-host.mjs --project $GAME --status
+node spike/viewweaver-host.mjs --project $GAME <Prefab名>
+node spike/viewweaver-host.mjs --project $GAME --all
 ```
 
 只用**该工程**的 `extensions/viewweaver`。有 `extensions/genbot` 的老工程产出在 `_genbot/`，不要用外带 ViewWeaver 把它迁到 `views/`。
