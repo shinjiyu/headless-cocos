@@ -106,12 +106,9 @@ function kitStatus(opts = {}) {
 function kitMissingHelp(repoRoot) {
   const root = repoRoot || repoRootFrom(__dirname);
   return [
-    `[runtime-kit] missing pinned ${ENGINE_VERSION} runtime (engine + packer).`,
-    'Do not install Cocos Creator for this. Ask for the versioned kit:',
-    `  ${path.join(root, 'runtime', ENGINE_VERSION)}/`,
-    '  or HEADLESS_RUNTIME_URL → node spike/fetch-runtime.mjs',
-    'Maintainers (who already have a bake) regenerate with:',
-    '  node spike/bake-runtime.mjs --zip',
+    `[runtime-kit] missing ${path.join(root, 'runtime', ENGINE_VERSION)}/.`,
+    'This directory ships in the repo. Re-clone feat/artist-preview-design.',
+    'Do not install Cocos Creator. Do not extract app.asar.',
   ].join('\n');
 }
 

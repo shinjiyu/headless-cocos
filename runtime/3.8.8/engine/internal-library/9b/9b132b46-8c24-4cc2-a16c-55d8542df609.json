@@ -1,0 +1,11 @@
+{
+  "__type__": "cc.ParticleAsset",
+  "_name": "fire",
+  "_objFlags": 0,
+  "__editorExtras__": {},
+  "_native": ".plist",
+  "spriteFrame": {
+    "__uuid__": "50733e86-453e-4e0f-9bab-1f8e21e2248f@f9941",
+    "__expectedType__": "cc.SpriteFrame"
+  }
+}

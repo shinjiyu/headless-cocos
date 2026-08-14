@@ -1,0 +1,45 @@
+{
+  "__type__": "cc.BitmapFont",
+  "_name": "probe",
+  "_objFlags": 0,
+  "__editorExtras__": {},
+  "_native": "",
+  "fntDataStr": "",
+  "spriteFrame": {
+    "__uuid__": "ca2738c8-ce76-4fce-a6b3-0ee52b82a53d@f9941",
+    "__expectedType__": "cc.SpriteFrame"
+  },
+  "fontSize": 32,
+  "fntConfig": {
+    "commonHeight": 36,
+    "fontSize": 32,
+    "atlasName": "bmpage.png",
+    "fontDefDictionary": {
+      "65": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 20,
+          "height": 24
+        },
+        "xOffset": 0,
+        "yOffset": 4,
+        "xAdvance": 22
+      },
+      "66": {
+        "rect": {
+          "x": 20,
+          "y": 0,
+          "width": 20,
+          "height": 24
+        },
+        "xOffset": 0,
+        "yOffset": 4,
+        "xAdvance": 22
+      }
+    },
+    "kerningDict": {
+      "4259906": -2
+    }
+  }
+}

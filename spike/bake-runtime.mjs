@@ -100,7 +100,7 @@ function main() {
   fs.writeFileSync(
     path.join(dest, 'README.md'),
     `# Headless runtime ${ENGINE_VERSION}\n\n` +
-      `Unzip here. \`preview-mirror\` and mini-packer resolve this folder automatically.\n` +
+      `Ships in this repo. \`preview-mirror\` and mini-packer resolve this folder automatically.\n` +
       `Do not install Cocos Creator.\n`,
   );
 

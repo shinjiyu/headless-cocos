@@ -1,0 +1,19 @@
+{
+  "__type__": "sp.SkeletonData",
+  "_name": "spineboy-pro",
+  "_objFlags": 0,
+  "__editorExtras__": {},
+  "_native": ".bin",
+  "_skeletonJson": null,
+  "textures": [
+    {
+      "__uuid__": "6e1e3954-cca3-4331-83d8-95fce4afa4c9@6c48a",
+      "__expectedType__": "cc.Texture2D"
+    }
+  ],
+  "textureNames": [
+    "spineboy-pma.png"
+  ],
+  "scale": 1,
+  "_atlasText": "spineboy-pma.png\n\tsize: 1024, 256\n\tfilter: Linear, Linear\n\tpma: true\n\tscale: 0.5\ncrosshair\n\tbounds: 352, 7, 45, 45\neye-indifferent\n\tbounds: 862, 105, 47, 45\neye-surprised\n\tbounds: 505, 79, 47, 45\nfront-bracer\n\tbounds: 826, 66, 29, 40\nfront-fist-closed\n\tbounds: 786, 65, 38, 41\nfront-fist-open\n\tbounds: 710, 51, 43, 44\n\trotate: 90\nfront-foot\n\tbounds: 210, 6, 63, 35\nfront-shin\n\tbounds: 665, 128, 41, 92\n\trotate: 90\nfront-thigh\n\tbounds: 2, 2, 23, 56\n\trotate: 90\nfront-upper-arm\n\tbounds: 250, 205, 23, 49\ngoggles\n\tbounds: 665, 171, 131, 83\ngun\n\tbounds: 798, 152, 105, 102\nhead\n\tbounds: 2, 27, 136, 149\nhoverboard-board\n\tbounds: 2, 178, 246, 76\nhoverboard-thruster\n\tbounds: 722, 96, 30, 32\n\trotate: 90\nhoverglow-small\n\tbounds: 275, 81, 137, 38\nmouth-grind\n\tbounds: 614, 97, 47, 30\nmouth-oooo\n\tbounds: 612, 65, 47, 30\nmouth-smile\n\tbounds: 661, 64, 47, 30\nmuzzle-glow\n\tbounds: 382, 54, 25, 25\nmuzzle-ring\n\tbounds: 275, 54, 25, 105\n\trotate: 90\nmuzzle01\n\tbounds: 911, 95, 67, 40\n\trotate: 90\nmuzzle02\n\tbounds: 792, 108, 68, 42\nmuzzle03\n\tbounds: 956, 171, 83, 53\n\trotate: 90\nmuzzle04\n\tbounds: 275, 7, 75, 45\nmuzzle05\n\tbounds: 140, 3, 68, 38\nneck\n\tbounds: 250, 182, 18, 21\nportal-bg\n\tbounds: 140, 43, 133, 133\nportal-flare1\n\tbounds: 554, 65, 56, 30\nportal-flare2\n\tbounds: 759, 112, 57, 31\n\trotate: 90\nportal-flare3\n\tbounds: 554, 97, 58, 30\nportal-shade\n\tbounds: 275, 121, 133, 133\nportal-streaks1\n\tbounds: 410, 126, 126, 128\nportal-streaks2\n\tbounds: 538, 129, 125, 125\nrear-bracer\n\tbounds: 857, 67, 28, 36\nrear-foot\n\tbounds: 663, 96, 57, 30\nrear-shin\n\tbounds: 414, 86, 38, 89\n\trotate: 90\nrear-thigh\n\tbounds: 756, 63, 28, 47\nrear-upper-arm\n\tbounds: 60, 5, 20, 44\n\trotate: 90\ntorso\n\tbounds: 905, 164, 49, 90\n"
+}

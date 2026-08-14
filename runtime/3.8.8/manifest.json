@@ -1,0 +1,11 @@
+{
+  "version": "3.8.8",
+  "creator": "3.8.8",
+  "bakedAt": "2026-08-14T12:43:26.659Z",
+  "parts": [
+    "engine",
+    "node_modules",
+    "utils"
+  ],
+  "note": "Pinned headless runtime. End users unzip this kit; they do not install Creator."
+}

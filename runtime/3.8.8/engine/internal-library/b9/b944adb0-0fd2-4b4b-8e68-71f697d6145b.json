@@ -1,0 +1,60 @@
+{
+  "__type__": "sp.SkeletonData",
+  "_name": "probe",
+  "_objFlags": 0,
+  "__editorExtras__": {},
+  "_native": "",
+  "_skeletonJson": {
+    "skeleton": {
+      "hash": "headless",
+      "spine": "3.8.75",
+      "x": -32,
+      "y": -32,
+      "width": 64,
+      "height": 64,
+      "images": "./",
+      "audio": ""
+    },
+    "bones": [
+      {
+        "name": "root"
+      }
+    ],
+    "slots": [
+      {
+        "name": "card",
+        "bone": "root",
+        "attachment": "card"
+      }
+    ],
+    "skins": [
+      {
+        "name": "default",
+        "attachments": {
+          "card": {
+            "card": {
+              "x": 0,
+              "y": 0,
+              "width": 64,
+              "height": 64
+            }
+          }
+        }
+      }
+    ],
+    "animations": {
+      "idle": {}
+    }
+  },
+  "_atlasText": "\nprobe.png\nsize: 64,64\nformat: RGBA8888\nfilter: Linear,Linear\nrepeat: none\ncard\n  rotate: false\n  xy: 0, 0\n  size: 64, 64\n  orig: 64, 64\n  offset: 0, 0\n  index: -1\n",
+  "textures": [
+    {
+      "__uuid__": "0c75986a-2153-42f8-ac9f-e1ef40b3864e@6c48a",
+      "__expectedType__": "cc.Texture2D"
+    }
+  ],
+  "textureNames": [
+    "probe.png"
+  ],
+  "scale": 1
+}

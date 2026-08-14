@@ -1,0 +1,12 @@
+{
+  "__type__": "cc.SpriteAtlas",
+  "content": {
+    "name": "pack",
+    "spriteFrames": [
+      "left",
+      "66bf9d7d-aba2-4d21-b76c-ca5272152316@81188",
+      "right",
+      "66bf9d7d-aba2-4d21-b76c-ca5272152316@7c4f2"
+    ]
+  }
+}
