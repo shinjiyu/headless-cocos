@@ -16,9 +16,9 @@
 ## 1. 克隆
 
 ```powershell
-hutao clone https://github.com/shinjiyu/headless-cocos.git $STACK
+git clone https://github.com/shinjiyu/headless-cocos.git $STACK
 cd $STACK
-hutao checkout feat/artist-preview-design
+git checkout feat/artist-preview-design
 npm install
 ```
 
