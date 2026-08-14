@@ -24,12 +24,20 @@ npm install
 
 ## 2. 建工程
 
-默认是 **2D** 壳（Canvas）。3D 加 `--template base-ai-3d`。
+用户说了 3D / 模型 / 灯 / 透视，只用 3D。不要先建 2D 再改。
+
+### 3D
+
+```powershell
+cd $STACK
+node spike/bootstrap.mjs --template base-ai-3d --out $GAME
+```
+
+### 2D
 
 ```powershell
 cd $STACK
 node spike/bootstrap.mjs --out $GAME
-# node spike/bootstrap.mjs --template base-ai-3d --out $GAME
 ```
 
 ## 3. 预览
