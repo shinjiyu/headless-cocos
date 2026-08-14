@@ -2,6 +2,9 @@
 
 Prefab → typed View bindings **without** Creator, MCP, or `Editor.Message`.
 
+New projects from `--template base-ai` already vendor `extensions/viewweaver`
+(see [base-ai-headless.md](base-ai-headless.md)).
+
 This is the generate-for-ai path. The preview stack does not reimplement the
 generator; it runs the **project's own** CLI so output layout stays correct.
 

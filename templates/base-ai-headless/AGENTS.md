@@ -1,0 +1,23 @@
+# Headless Cocos project — no Creator IDE, no MCP
+
+Preview is a **headless** service (`preview-mirror` + mini-packer + ViewWeaver host).
+
+## How preview updates
+
+1. Edit files under `assets/`.
+2. The preview process watches the disk.
+3. Missing `.meta` files are minted; scripts are packed; prefabs can run ViewWeaver.
+4. The browser receives HMR.
+
+## ViewWeaver
+
+- Output: `assets/scripts/views/<Name>/`
+- HTTP: `GET/POST /__viewweaver`
+- CLI: `node spike/viewweaver-host.mjs --project <this-dir> <PrefabName>`
+- Do **not** pass `--regen-bind` unless you intend to rewrite the contract.
+
+## Do not
+
+- Call `cocosmcp` / Creator `Editor.Message` / any MCP bridge.
+- Start Cocos Creator or refresh an IDE preview.
+- Copy playable-ad Board / MainUI / CTA stubs into this shell unless the project is a PA.

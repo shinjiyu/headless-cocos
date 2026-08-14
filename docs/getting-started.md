@@ -2,6 +2,32 @@
 
 Bring up headless preview against a Cocos Creator **3.8.8** project.
 
+## Create from a template (no IDE)
+
+Default shell is the **headless flavor of [baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos)**:
+ViewWeaver + Creator 3.8.8 settings + `PreviewBoot` scene. **No MCP**, no
+playable Board / MainUI / CTA.
+
+```powershell
+cd d:\tempWorkspace\headless-cocos-research
+node spike/create-project.mjs --list
+node spike/create-project.mjs --template base-ai --out D:\tempWorkspace\my-game
+# then: $env:PROJECT="D:\tempWorkspace\my-game"; node spike/preview-mirror.mjs
+```
+
+`--from <existing>` copies any 3.8 project (skips `library/` / `temp/`).
+Add `--no-mcp` to drop `cocos-meta-mcp` and Creator MCP skills from that copy.
+New `package.json` uuid only; asset uuids stay so prefab references keep working.
+
+`pa-mini` / `base-pa` stay as harness-only PA fixtures — not the create default.
+
+Refresh the vendored shell from [baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos) `master`, then export onto the `headless` branch:
+
+```powershell
+node spike/pack-base-ai-headless.mjs --from D:\tempWorkspace\baseAIAutoCocos
+node spike/pack-base-ai-headless.mjs --export D:\tempWorkspace\baseAIAutoCocos
+```
+
 ## Prerequisites
 
 | Requirement | Notes |
@@ -11,13 +37,8 @@ Bring up headless preview against a Cocos Creator **3.8.8** project.
 | Target project | Same minor engine version; `assets/` present |
 | Optional Docker | Docker Desktop 4.x (Windows/macOS) or Linux Docker |
 
-Confirm Creator once by opening the project and clicking **Play**. That warms:
-
-- `engine/bin/.cache/dev/preview/` (bundled `cc` + import-map)
-- `temp/programming/packer-driver/targets/preview/` (optional baseline)
-- `library/` (optional baseline; mini mode can rebuild it)
-
-After the snapshot exists, Creator may stay closed.
+If `spike/engine-snapshot/preview` already exists, skip Creator.
+`preview-mirror` auto-resolves that snapshot. Only bake when it is missing.
 
 ## Engine snapshot
 

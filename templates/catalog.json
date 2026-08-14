@@ -1,0 +1,37 @@
+{
+  "name": "headless-cocos-templates",
+  "engine": "3.8.8",
+  "default": "base-ai",
+  "runtime": {
+    "engineSnapshot": [
+      "templates/runtime/engine-snapshot",
+      "spike/engine-snapshot"
+    ],
+    "note": "Pre-baked cc preview + internal-library. Not committed (Cocos license). Auto-resolved by preview-mirror."
+  },
+  "templates": [
+    {
+      "id": "base-ai",
+      "dir": "templates/base-ai-headless",
+      "publish": "https://github.com/shinjiyu/baseAIAutoCocos/tree/headless",
+      "source": "https://github.com/shinjiyu/baseAIAutoCocos",
+      "default": true,
+      "mcp": false,
+      "viewweaver": true,
+      "launchScene": "PreviewBoot",
+      "includes": [
+        "extensions/viewweaver",
+        "settings/v2",
+        "assets/scene/PreviewBoot.scene",
+        "assets/resources (isBundle)",
+        "assets/scripts/views",
+        "assets/prefabs"
+      ],
+      "excludes": [
+        "extensions/cocos-meta-mcp",
+        "Creator MCP skills",
+        "Board / MainUI / CTA / symbol-library"
+      ]
+    }
+  ]
+}

@@ -34,15 +34,17 @@ import {
   matchRegistryAsset,
   status as viewweaverStatus,
 } from './viewweaver-host.mjs';
+import { resolveEngineSnapshot } from './engine-snapshot-path.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
-const PROJECT = path.resolve(process.env.PROJECT || 'd:/tempWorkspace/baseAIAutoCocos');
+const PROJECT = path.resolve(
+  process.env.PROJECT || path.join(__dirname, '../templates/base-ai-headless'),
+);
 const CREATOR = process.env.CREATOR_ROOT || 'C:/ProgramData/cocos/editors/Creator/3.8.8';
 const UPSTREAM = process.env.PREVIEW_UPSTREAM || '';
 const CACHE = path.join(__dirname, 'cache');
-// Engine preview cache. Falls back to a snapshot if set (for Creator-off mode).
-const ENGINE_SNAPSHOT = process.env.ENGINE_SNAPSHOT || '';
+const ENGINE_SNAPSHOT = resolveEngineSnapshot();
 const ENGINE_PREVIEW = ENGINE_SNAPSHOT
   ? path.join(ENGINE_SNAPSHOT, 'preview')
   : path.join(CREATOR, 'resources/resources/3d/engine/bin/.cache/dev/preview');
@@ -1854,6 +1856,7 @@ server.listen(PORT, async () => {
   console.log('[preview-mirror] http://127.0.0.1:' + PORT);
   console.log('  PROJECT=' + PROJECT);
   console.log('  PACK=' + PACK_PREVIEW);
+  console.log('  ENGINE_SNAPSHOT=' + (ENGINE_SNAPSHOT || '(none — using Creator install)'));
   console.log('  ENGINE=' + ENGINE_PREVIEW);
   console.log('  UPSTREAM=' + (UPSTREAM || '(none)'));
   console.log('  HMR=ws://127.0.0.1:' + PORT + '/__hmr  (open WITHOUT autoReload=false)');

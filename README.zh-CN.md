@@ -215,5 +215,6 @@ node .\spike\e2e-image-import.cjs
 
 ## 相关链接
 
-- 示例工程：[shinjiyu/baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos)
+- 无头模板（不带 MCP）：[baseAIAutoCocos `headless`](https://github.com/shinjiyu/baseAIAutoCocos/tree/headless)（`templates/base-ai-headless`）
+- Creator + MCP：[baseAIAutoCocos `master`](https://github.com/shinjiyu/baseAIAutoCocos)
 - 上游产品：[Cocos Creator](https://www.cocos.com/creator)

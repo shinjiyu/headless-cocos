@@ -221,7 +221,7 @@ node .\spike\e2e-bundle.cjs
 
 - **Creator 3.8.x only** (validated on 3.8.8)
 - Auto sprite trim emits untrimmed rects (no pixel decode)
-- Engine / `internal-library` snapshots are **not** in git — generate locally
+- Engine / `internal-library` snapshots are **not** in git (Cocos license). This checkout already has a pre-baked `spike/engine-snapshot/`; `preview-mirror` uses it automatically.
 - 3D particles out of scope for the current 2D playable pipeline
 
 ---
@@ -234,5 +234,6 @@ Research / internal tooling. Engine binaries and `@cocos/*` packages remain unde
 
 ## Related
 
-- Sample harness: [shinjiyu/baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos)
+- Template library (no MCP): [baseAIAutoCocos `headless`](https://github.com/shinjiyu/baseAIAutoCocos/tree/headless) (`templates/base-ai-headless`)
+- Creator + MCP: [baseAIAutoCocos `master`](https://github.com/shinjiyu/baseAIAutoCocos)
 - Upstream: [Cocos Creator](https://www.cocos.com/en/creator)
