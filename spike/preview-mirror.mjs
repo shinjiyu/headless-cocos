@@ -69,7 +69,13 @@ function libResolve(rel) {
   return own;
 }
 const ASSETS = path.join(PROJECT, 'assets');
-const EFFECT_BIN = path.join(PROJECT, 'temp/asset-db/effect/effect.bin');
+const EFFECT_BIN_PROJECT = path.join(PROJECT, 'temp/asset-db/effect/effect.bin');
+const EFFECT_BIN_KIT = ENGINE_SNAPSHOT ? path.join(ENGINE_SNAPSHOT, 'effect.bin') : '';
+function resolveEffectBin() {
+  if (fs.existsSync(EFFECT_BIN_PROJECT)) return EFFECT_BIN_PROJECT;
+  if (EFFECT_BIN_KIT && fs.existsSync(EFFECT_BIN_KIT)) return EFFECT_BIN_KIT;
+  return EFFECT_BIN_PROJECT;
+}
 const REQLOG = process.env.REQLOG || path.join(__dirname, 'requests.jsonl');
 const WATCH = process.env.WATCH !== '0';
 const RELOAD_DEBOUNCE_MS = Number(process.env.RELOAD_DEBOUNCE_MS || 400);
@@ -974,7 +980,7 @@ function l10nResourceBundle() {
 
 function mapSpecial(urlPath) {
   const u = new URL(urlPath, 'http://127.0.0.1');
-  if (u.pathname === '/src/effect.bin') return EFFECT_BIN;
+  if (u.pathname === '/src/effect.bin') return resolveEffectBin();
   if (u.pathname === '/engine_external/' || u.pathname === '/engine_external') {
     const raw = u.searchParams.get('url') || '';
     const rel = raw.replace(/^external:/, '');
