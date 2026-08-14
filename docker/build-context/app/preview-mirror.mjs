@@ -160,6 +160,11 @@ function sendMapped(res, mapped) {
     send(res, 200, body, 'application/json; charset=utf-8', 'engine-import-map-rewrite');
     return true;
   }
+  if (mapped.rewrite === 'packer-record-fallback') {
+    const empty = mapped.name === 'import-map.json' ? '{"imports":{},"scopes":{}}' : '{}';
+    send(res, 200, empty, 'application/json; charset=utf-8', 'packer-record-fallback');
+    return true;
+  }
   if (mapped.rewrite === 'bundle-config') {
     const body = buildBundleConfig(mapped.name, mapped.root);
     send(res, 200, body, 'application/json; charset=utf-8', 'bundle-config-synth');
@@ -805,16 +810,19 @@ function mapPath(urlPath) {
   if (p === '/preview-app/main.js') return path.join(CACHE, 'preview-app-main.js');
   if (p.startsWith('/scripting/x/')) {
     const rel = p.slice('/scripting/x/'.length);
-    // Overlay chunks/* from mini (user script rebuilds go here).
-    // Records/import-map stay from Creator's PACK_PREVIEW because it also indexes
-    // engine chunks (`cce:/internal/x/cc`, prerequisite-imports, etc.) that mini
-    // doesn't produce. Chunk filenames are hashes of source paths, so mini's
-    // fresh HeadlessProbe.ts chunk lands at the same URL Creator's import-map
-    // already points to — bytes get replaced transparently.
-    if (rel.startsWith('chunks/')) {
-      const mini = safeJoin(PACK_PREVIEW_MINI, rel);
+    const mini = safeJoin(PACK_PREVIEW_MINI, rel);
+    if (PACKER === 'mini') {
       if (mini && fs.existsSync(mini)) return mini;
+      if (
+        rel === 'import-map.json' ||
+        rel === 'resolution-detail-map.json' ||
+        rel === 'main-record.json' ||
+        rel === 'assembly-record.json'
+      ) {
+        return { rewrite: 'packer-record-fallback', name: rel };
+      }
     }
+    if (rel.startsWith('chunks/') && mini && fs.existsSync(mini)) return mini;
     return safeJoin(PACK_PREVIEW, rel);
   }
   if (p.startsWith('/scripting/engine/bin/.cache/dev/preview/')) {
@@ -1020,34 +1028,37 @@ let buildSeq = 0;
 function runMiniBuild(reason) {
   if (buildRunning) {
     buildPending = true;
-    return;
+    return Promise.resolve(false);
   }
   buildRunning = true;
   const t0 = Date.now();
   const seq = ++buildSeq;
   console.log(`[mini] build#${seq} start (${reason})`);
-  const child = spawn(process.execPath, [MINI_BUILD_SCRIPT], {
-    cwd: path.dirname(MINI_BUILD_SCRIPT),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, VERBOSE: '' },
-  });
-  const outBuf = [];
-  child.stdout.on('data', (b) => outBuf.push(b));
-  child.stderr.on('data', (b) => outBuf.push(b));
-  child.on('close', (code) => {
-    const ms = Date.now() - t0;
-    if (code === 0) {
-      console.log(`[mini] build#${seq} ok in ${ms}ms`);
-      broadcastReload('mini:' + reason);
-    } else {
-      const tail = Buffer.concat(outBuf).toString().slice(-800);
-      console.error(`[mini] build#${seq} FAILED (code=${code}) in ${ms}ms\n${tail}`);
-    }
-    buildRunning = false;
-    if (buildPending) {
-      buildPending = false;
-      runMiniBuild('pending');
-    }
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [MINI_BUILD_SCRIPT], {
+      cwd: path.dirname(MINI_BUILD_SCRIPT),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, VERBOSE: '' },
+    });
+    const outBuf = [];
+    child.stdout.on('data', (b) => outBuf.push(b));
+    child.stderr.on('data', (b) => outBuf.push(b));
+    child.on('close', (code) => {
+      const ms = Date.now() - t0;
+      if (code === 0) {
+        console.log(`[mini] build#${seq} ok in ${ms}ms`);
+        broadcastReload('mini:' + reason);
+      } else {
+        const tail = Buffer.concat(outBuf).toString().slice(-800);
+        console.error(`[mini] build#${seq} FAILED (code=${code}) in ${ms}ms\n${tail}`);
+      }
+      buildRunning = false;
+      if (buildPending) {
+        buildPending = false;
+        runMiniBuild('pending');
+      }
+      resolve(code === 0);
+    });
   });
 }
 function scheduleMiniBuild(reason) {
@@ -1854,8 +1865,8 @@ server.on('upgrade', (req, socket, head) => {
 server.listen(PORT, async () => {
   console.log('[preview-mirror] http://127.0.0.1:' + PORT);
   console.log('  PROJECT=' + PROJECT);
-  console.log('  PACK=' + PACK_PREVIEW);
-  console.log('  ENGINE_SNAPSHOT=' + (ENGINE_SNAPSHOT || '(none — using Creator install)'));
+  console.log('  PACK=' + (PACKER === 'mini' ? PACK_PREVIEW_MINI : PACK_PREVIEW));
+  console.log('  ENGINE_SNAPSHOT=' + ENGINE_SNAPSHOT);
   console.log('  ENGINE=' + ENGINE_PREVIEW);
   console.log('  UPSTREAM=' + (UPSTREAM || '(none)'));
   console.log('  HMR=ws://127.0.0.1:' + PORT + '/__hmr  (open WITHOUT autoReload=false)');
@@ -1898,7 +1909,7 @@ server.listen(PORT, async () => {
       }
       // Prime: sync all JSON assets once, then build scripts once
       bootSyncAssets();
-      runMiniBuild('boot');
+      await runMiniBuild('boot');
     } else {
       // Creator mode: react to whatever Creator writes to disk
       watchTree(PACK_PREVIEW, 'packer');

@@ -17,7 +17,6 @@ dist/*.zip
 
 # runtime / local noise
 spike/chrome-profile/
-spike/cache/
 spike/requests.jsonl
 *.log
 *.err.log

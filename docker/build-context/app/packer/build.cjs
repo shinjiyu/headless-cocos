@@ -99,6 +99,8 @@ const { ensureAssetMeta } = require('../importers/ensure-meta.cjs');
 // and modules involved in import cycles hard-fail (e.g. `X is not a function`
 // when a decorator is used before its module executed) instead of matching
 // Creator preview behaviour.
+const CC_MODULE_URL = 'cce:/internal/x/cc';
+const PREREQ_MODULE_URL = 'cce:/internal/x/prerequisite-imports';
 const CR_MODULE_URL = 'cce:/internal/code-quality/cr.mjs';
 const CR_MODULE_SOURCE = `/**
  * This is the module which implements circular-reference detection.
@@ -153,6 +155,42 @@ async function collectScripts(root) {
 // URL is derived by substituting the project root, so `file:///D:/proj/assets/
 // x.ts` stays stable even when the mini-packer runs inside a Linux container
 // where the disk path is `/workspace/assets/x.ts`.
+const CC_FU_ALIAS = {
+  'spine-3.8': 'spine',
+  'spine-4.2': 'spine',
+};
+
+function readProjectCcFu(project) {
+  const engineJson = path.join(project, 'settings/v2/packages/engine.json');
+  let names = [];
+  try {
+    const cfg = JSON.parse(fs.readFileSync(engineJson, 'utf8'));
+    const key = cfg.modules?.globalConfigKey || 'defaultConfig';
+    names = cfg.modules?.configs?.[key]?.includeModules || [];
+  } catch {
+    names = ['2d', 'affine-transform', 'audio', 'base', 'custom-pipeline', 'gfx-webgl', 'graphics', 'mask', 'spine', 'tween', 'ui'];
+  }
+  const seen = new Set();
+  const out = [];
+  for (const raw of names) {
+    const n = CC_FU_ALIAS[raw] || raw;
+    if (!n || n === 'marionette' || n === 'procedural-animation') continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
+function buildCcModuleSource(ccFu) {
+  return ccFu.map((n) => `export * from 'cce:/internal/x/cc-fu/${n}';`).join('\n') + '\n';
+}
+
+function buildPrereqModuleSource(urls) {
+  if (!urls.length) return 'export {};\n';
+  return urls.map((u) => `import '${u}';`).join('\n') + '\n';
+}
+
 function moduleUrlFor(realAbsPath) {
   if (!PROJECT_URL) return pathToFileURL(realAbsPath).href;
   let rel = path.relative(PROJECT, realAbsPath);
@@ -206,15 +244,18 @@ async function build() {
     preserveSymlinks: !!PROJECT_URL,
     logger,
   });
-  modLo.setExternals(['cc']);
+  const ccFu = readProjectCcFu(PROJECT);
+  modLo.setExternals(['cc', ...ccFu.map((n) => `cce:/internal/x/cc-fu/${n}`)]);
   modLo.addMemoryModule(CR_MODULE_URL, CR_MODULE_SOURCE);
+  modLo.addMemoryModule(CC_MODULE_URL, buildCcModuleSource(ccFu));
+  const files = await collectScripts(ASSETS);
+  modLo.addMemoryModule(PREREQ_MODULE_URL, buildPrereqModuleSource(files.map((f) => moduleUrlFor(f))));
   // assetsPrefix is a URL prefix; PROJECT_URL takes precedence so mod-lo's
   // assetPrefix-based logic (URL identity, subpath handling) sees the same
   // world as chunk hashing.
   const assetsPrefix = (PROJECT_URL ? (PROJECT_URL + '/assets') : pathToFileURL(ASSETS).href) + '/';
   modLo.setAssetPrefixes([assetsPrefix]);
 
-  const files = await collectScripts(ASSETS);
   const uuidMap = await readUuidMap(files);
   for (const [url, uuid] of uuidMap) modLo.setUUID(url, uuid);
 
@@ -226,7 +267,7 @@ async function build() {
     logger,
   });
 
-  const entries = files.map((f) => moduleUrlFor(f));
+  const entries = [CC_MODULE_URL, PREREQ_MODULE_URL, ...files.map((f) => moduleUrlFor(f))];
   const t0 = Date.now();
   const res = await packer.build(entries);
   const dt = Date.now() - t0;
