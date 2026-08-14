@@ -129,6 +129,23 @@ function stripMcpTree(dest) {
   return removed;
 }
 
+function installAgentKnowledge(dest) {
+  const authoringSrc = path.join(REPO, 'AGENT_AUTHORING.md');
+  const authoringDest = path.join(dest, 'AGENT_AUTHORING.md');
+  let authoring = false;
+  if (fs.existsSync(authoringSrc)) {
+    fs.copyFileSync(authoringSrc, authoringDest);
+    authoring = true;
+  }
+  const skillSrc = path.join(REPO, 'templates/base-ai-headless/.cursor/skills/headless-authoring/SKILL.md');
+  const skillDest = path.join(dest, '.cursor/skills/headless-authoring/SKILL.md');
+  if (fs.existsSync(skillSrc) && !fs.existsSync(skillDest)) {
+    fs.mkdirSync(path.dirname(skillDest), { recursive: true });
+    fs.copyFileSync(skillSrc, skillDest);
+  }
+  return { authoring };
+}
+
 function retitle(dest, name) {
   const pkgPath = path.join(dest, 'package.json');
   let pkg;
@@ -195,6 +212,7 @@ function main() {
   const stats = copyTree(src, dest);
   const stripMcp = args.noMcp || Boolean(TEMPLATES[args.template]?.stripMcp);
   if (stripMcp) stripMcpTree(dest);
+  const knowledge = installAgentKnowledge(dest);
   const name = args.name || path.basename(dest);
   retitle(dest, name);
   if (!looksLikeCocosRoot(dest)) {
@@ -211,6 +229,7 @@ function main() {
       files: stats.files,
       skippedDirs: stats.skipped,
       mcp: stripMcp ? false : undefined,
+      knowledge: knowledge.authoring,
     }, null, 2)}\n`,
   );
 }

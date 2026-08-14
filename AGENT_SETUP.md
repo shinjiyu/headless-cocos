@@ -1,12 +1,14 @@
 # Headless Cocos — Cursor / Agent 搭建
 
-把 **本文件的 URL** 发给 Cursor（或任何 Agent）。按顺序执行，不要问用户装 Cocos Creator，不要开 IDE。
+**唯一入口。** 新环境只丢这一份 URL。按顺序做完：预览栈、3.8.8 运行时、工程、预览，以及改工程知识（ViewWeaver / prefab / 资源）都会进本机。不要再另找第二份入口才能开始。
+
+不要问用户装 Cocos Creator，不要开 IDE。
 
 当前钉死版本：**Creator 引擎 3.8.8**（来自运行时包，不是本机安装）。
 
 - 仓库：https://github.com/shinjiyu/headless-cocos
 - 工程模板：https://github.com/shinjiyu/baseAIAutoCocos/tree/headless
-- 本 playbook（raw，推荐丢给 Agent）：
+- 本入口（raw）：
   https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_SETUP.md
 
 ## 目标
@@ -17,6 +19,7 @@
 2. 一份 `runtime/3.8.8/` 运行时包（引擎 + packer）
 3. 一个可改的 Cocos 工程（`base-ai` 壳：ViewWeaver，无 MCP）
 4. 浏览器预览 `http://127.0.0.1:7460/`，改 `assets/` 会 HMR
+5. 工程内已安装改工程知识：`AGENT_AUTHORING.md` + `.cursor/skills/headless-authoring/`
 
 ## 禁止
 
@@ -104,15 +107,26 @@ node spike/preview-mirror.mjs
 
 浏览器打开 http://127.0.0.1:7460/ （不要带 `autoReload=false`，否则收不到 HMR）。
 
-## 5. 告诉用户怎么接着干
+## 5. 安装并读改工程知识（不要停在「环境好了」）
 
-改工程（prefab / scene / 资源 / ViewWeaver）按这份知识，不要靠 MCP skill：
+`bootstrap` / `create-project` 已把知识拷进工程：
 
-https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_AUTHORING.md
+- `D:\tempWorkspace\my-game\AGENT_AUTHORING.md`
+- `D:\tempWorkspace\my-game\.cursor\skills\headless-authoring\SKILL.md`
 
-- 改 `D:\tempWorkspace\my-game\assets\` → 自动补 `.meta`、打包、热更
+**立刻 Read 工程里的 `AGENT_AUTHORING.md`**，之后改 prefab / scene / 资源 / View 只跟这份走。不要靠 Creator MCP skill。
+
+若拷贝缺失（极旧模板），从本仓库根再拷一次：
+
+```powershell
+Copy-Item .\AGENT_AUTHORING.md D:\tempWorkspace\my-game\AGENT_AUTHORING.md
+```
+
+向用户交代：
+
+- 唯一入口已经跑完；以后新开对话打开的是 `my-game`，会带上 headless-authoring skill
+- 改 `assets/` → 自动补 `.meta`、打包、热更
 - 业务节点要 typed 访问 → bind + `POST /__viewweaver`
-- 不要开 Creator，不要 MCP
 
 ## 失败对照
 

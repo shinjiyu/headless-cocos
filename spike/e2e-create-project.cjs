@@ -76,6 +76,8 @@ function exists(rel) {
   const agents = fs.readFileSync(path.join(OUT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /no MCP/i);
   assert.match(agents, /__viewweaver/);
+  assert.ok(exists('AGENT_AUTHORING.md'), 'authoring knowledge copied into project');
+  assert.ok(exists('.cursor/skills/headless-authoring/SKILL.md'), 'authoring skill installed');
 
   console.log('[e2e-create-project] SUCCESS', {
     out: OUT,

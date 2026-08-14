@@ -2,9 +2,8 @@
 
 Preview is a **headless** service (`preview-mirror` + mini-packer + ViewWeaver host).
 
-操作知识（改 prefab / scene / 资源 / ViewWeaver）：
-
-https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_AUTHORING.md
+操作知识：先读本仓库 `AGENT_AUTHORING.md`（搭建时由 SETUP 入口拷入）。
+Cursor skill：`.cursor/skills/headless-authoring/`。
 
 搭建：
 
