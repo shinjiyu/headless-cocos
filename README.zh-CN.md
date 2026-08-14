@@ -116,27 +116,19 @@ git clone https://github.com/shinjiyu/headless-cocos.git
 cd headless-cocos
 ```
 
-### 一次性引擎快照
+### 运行时包（不装 Creator）
 
-```powershell
-npx @electron/asar extract `
-  "C:\ProgramData\cocos\editors\Creator\3.8.8\resources\app.asar" `
-  tmp-asar-root
+向团队要 `headless-runtime-3.8.8.zip`，解压到 `runtime/3.8.8/`。不要装 Cocos Creator。
 
-node .\spike\snapshot-from-creator.cjs
-```
-
-完整说明：[Getting started](./docs/getting-started.md)
+说明：[Runtime kit](./docs/runtime-kit.md)
 
 ### 本地运行（mini）
 
 ```powershell
+node spike/bootstrap.mjs --out D:\tempWorkspace\my-game
 $env:PACKER = "mini"
-$env:PORT = "7460"
-$env:PROJECT = "D:\path\to\your-cocos-project"
-$env:ENGINE_SNAPSHOT = "$PWD\spike\engine-snapshot"
-$env:LAUNCH_SCENE = "Main"
-node .\spike\preview-mirror.mjs
+$env:PROJECT = "D:\tempWorkspace\my-game"
+node spike/preview-mirror.mjs
 ```
 
 浏览器打开 **http://127.0.0.1:7460/**

@@ -4,10 +4,9 @@
   "default": "base-ai",
   "runtime": {
     "engineSnapshot": [
-      "templates/runtime/engine-snapshot",
-      "spike/engine-snapshot"
+      "runtime/3.8.8/engine"
     ],
-    "note": "Pre-baked cc preview + internal-library. Not committed (Cocos license). Auto-resolved by preview-mirror."
+    "note": "Pinned 3.8.8 kit (engine + packer). End users unzip it; they do not install Creator."
   },
   "templates": [
     {

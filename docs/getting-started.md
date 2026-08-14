@@ -33,12 +33,11 @@ node spike/pack-base-ai-headless.mjs --export D:\tempWorkspace\baseAIAutoCocos
 | Requirement | Notes |
 |-------------|--------|
 | Node.js 20+ | Mirror and mini-packer |
-| Creator 3.8.8 | One-time install for engine snapshot only |
-| Target project | Same minor engine version; `assets/` present |
-| Optional Docker | Docker Desktop 4.x (Windows/macOS) or Linux Docker |
+| Runtime kit 3.8.8 | `runtime/3.8.8/` zip from the team — **not** a Creator install |
+| Target project | Same pin (`create-project --template base-ai`) |
+| Optional Docker | Image already contains the kit |
 
-If `spike/engine-snapshot/preview` already exists, skip Creator.
-`preview-mirror` auto-resolves that snapshot. Only bake when it is missing.
+See [runtime-kit.md](runtime-kit.md). Do not install Cocos Creator to preview.
 
 ## Engine snapshot
 

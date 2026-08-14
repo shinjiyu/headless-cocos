@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "draco3dgltf": "^1.5.7",
-    "meshoptimizer": "^1.2.0"
+    "meshoptimizer": "^1.2.0",
+    "ws": "^8.18.0"
   }
 }

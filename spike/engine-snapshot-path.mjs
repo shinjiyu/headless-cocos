@@ -1,31 +1,14 @@
 /**
- * Resolve the pre-baked Creator 3.8 engine snapshot.
- * Env wins; otherwise the template-library runtime, then spike/.
+ * ESM wrapper around the pinned runtime kit.
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const kit = require('./runtime-kit.cjs');
 
-export function snapshotLooksReady(dir) {
-  if (!dir) return false;
-  return fs.existsSync(path.join(dir, 'preview'));
-}
-
-export function resolveEngineSnapshot(opts = {}) {
-  const env = opts.env || process.env;
-  const repoRoot = opts.repoRoot || path.resolve(HERE, '..');
-  if (env.ENGINE_SNAPSHOT && snapshotLooksReady(env.ENGINE_SNAPSHOT)) {
-    return path.resolve(env.ENGINE_SNAPSHOT);
-  }
-  const candidates = [
-    path.join(repoRoot, 'templates/runtime/engine-snapshot'),
-    path.join(repoRoot, 'spike/engine-snapshot'),
-    path.join(HERE, 'engine-snapshot'),
-  ];
-  for (const dir of candidates) {
-    if (snapshotLooksReady(dir)) return path.resolve(dir);
-  }
-  return '';
-}
+export const snapshotLooksReady = kit.engineLooksReady;
+export const resolveEngineSnapshot = kit.resolveEngineSnapshot;
+export const resolveNpmRoot = kit.resolveNpmRoot;
+export const resolveUuidUtil = kit.resolveUuidUtil;
+export const kitStatus = kit.kitStatus;
+export const kitMissingHelp = kit.kitMissingHelp;

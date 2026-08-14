@@ -9,7 +9,7 @@
 | 有 | ViewWeaver、3.8.8 `settings/`、可启动 `PreviewBoot`、`resources` bundle |
 | 无 | MCP、`cocos-meta-mcp`、Board / MainUI / CTA |
 | 改 UI | 直接改 `assets/**/*.prefab` / `.scene` JSON，磁盘即真相 |
-| 引擎 | 预埋在 `spike/engine-snapshot/`（或 `templates/runtime/engine-snapshot/`），预览自动找，不必开 Creator |
+| 引擎 | 预埋在版本包 `runtime/3.8.8/`，预览只认这个包，不装 Creator |
 
 对外发布的工程壳：[baseAIAutoCocos `headless` 分支](https://github.com/shinjiyu/baseAIAutoCocos/tree/headless)（不同场景用不同分支）。
 

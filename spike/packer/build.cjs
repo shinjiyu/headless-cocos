@@ -47,12 +47,19 @@ function normalize(p) {
   return /^[a-z]:/.test(r) ? r[0].toUpperCase() + r.slice(1) : r;
 }
 
-const PROJECT = normalize(args.project || process.env.PROJECT || 'D:/tempWorkspace/baseAIAutoCocos');
-const NPM_ROOT = normalize(
-  args.npm ||
-  process.env.NPM_ROOT ||
-  'D:/tempWorkspace/headless-cocos-research/tmp-asar-root/node_modules'
+const { resolveNpmRoot, resolveUuidUtil, kitMissingHelp } = require('../runtime-kit.cjs');
+
+const PROJECT = normalize(
+  args.project ||
+    process.env.PROJECT ||
+    path.join(__dirname, '../../templates/base-ai-headless'),
 );
+const NPM_ROOT = normalize(
+  args.npm || resolveNpmRoot() || process.env.NPM_ROOT || '',
+);
+if (!NPM_ROOT) {
+  throw new Error(kitMissingHelp());
+}
 const ASSETS = path.join(PROJECT, 'assets');
 const OUT = normalize(
   args.out ||
@@ -111,6 +118,7 @@ export function report(imported, moduleRequest, importMeta, extras) {
 
 // Creator's uuid utility (compressUUID); path relative to asar extract layout
 const UUID_UTIL_PATH = args['uuid-util']
+  || resolveUuidUtil()
   || process.env.UUID_UTIL
   || path.resolve(NPM_ROOT, '../utils/dist/uuid.js');
 const uuidUtils = require(UUID_UTIL_PATH);

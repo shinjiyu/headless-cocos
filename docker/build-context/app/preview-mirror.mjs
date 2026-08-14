@@ -34,23 +34,22 @@ import {
   matchRegistryAsset,
   status as viewweaverStatus,
 } from './viewweaver-host.mjs';
-import { resolveEngineSnapshot } from './engine-snapshot-path.mjs';
+import { resolveEngineSnapshot, kitMissingHelp } from './engine-snapshot-path.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
 const PROJECT = path.resolve(
   process.env.PROJECT || path.join(__dirname, '../templates/base-ai-headless'),
 );
-const CREATOR = process.env.CREATOR_ROOT || 'C:/ProgramData/cocos/editors/Creator/3.8.8';
 const UPSTREAM = process.env.PREVIEW_UPSTREAM || '';
 const CACHE = path.join(__dirname, 'cache');
 const ENGINE_SNAPSHOT = resolveEngineSnapshot();
-const ENGINE_PREVIEW = ENGINE_SNAPSHOT
-  ? path.join(ENGINE_SNAPSHOT, 'preview')
-  : path.join(CREATOR, 'resources/resources/3d/engine/bin/.cache/dev/preview');
-const ENGINE_NATIVE_EXT = ENGINE_SNAPSHOT
-  ? path.join(ENGINE_SNAPSHOT, 'native-external')
-  : path.join(CREATOR, 'resources/resources/3d/engine/native/external');
+if (!ENGINE_SNAPSHOT) {
+  console.error(kitMissingHelp());
+  process.exit(2);
+}
+const ENGINE_PREVIEW = path.join(ENGINE_SNAPSHOT, 'preview');
+const ENGINE_NATIVE_EXT = path.join(ENGINE_SNAPSHOT, 'native-external');
 const PACK_PREVIEW = path.join(PROJECT, 'temp/programming/packer-driver/targets/preview');
 // mini-packer output; when present, overlays PACK_PREVIEW for user chunks
 const PACK_PREVIEW_MINI = path.join(PROJECT, 'temp/programming/packer-driver/targets/preview-mini');

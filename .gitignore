@@ -11,6 +11,12 @@ docker/build-context/engine/
 docker/build-context/vendor/
 docker/build-context/app/node_modules/
 
+# pinned runtime kit binaries (Cocos license — ship as a zip, not git)
+runtime/3.8.8/engine/
+runtime/3.8.8/node_modules/
+runtime/3.8.8/utils/
+dist/*.zip
+
 # runtime / local noise
 spike/chrome-profile/
 spike/cache/
@@ -43,4 +49,10 @@ docker/artist-preview/data/jobs/*
 docker/artist-preview/data/template-artifact/*
 !docker/artist-preview/data/template-artifact/.gitkeep
 docker/artist-preview/portal/node_modules/
+
+# harness-bench runtime
+harness-bench/docker-workspace/
+harness-bench/work/
+harness-bench/results/
+harness-bench/.env.glm
 

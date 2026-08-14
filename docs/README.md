@@ -13,6 +13,8 @@ Technical docs for **headless-cocos** (Creator 3.8 headless preview).
 | [bundle-support.md](bundle-support.md) | Contributors | Bundle discovery & config synthesis |
 | [viewweaver.md](viewweaver.md) | Contributors | Headless generate-for-ai (no Creator) |
 | [base-ai-headless.md](base-ai-headless.md) | Operators | Create shell: ViewWeaver, no MCP |
+| [runtime-kit.md](runtime-kit.md) | Operators | Pinned 3.8.8 engine+packer (no Creator) |
+| [../AGENT_SETUP.md](../AGENT_SETUP.md) | Cursor / Agent | Paste this URL to bootstrap a local preview |
 | [real-project-boot.md](real-project-boot.md) | Contributors | Lessons from production project boot |
 | [headless-cocos-final.md](headless-cocos-final.md) | Archive | Earlier milestone write-up (partially superseded) |
 

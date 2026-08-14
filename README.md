@@ -33,13 +33,16 @@ A **Node.js preview stack** that replaces Cocos Creator’s IDE runtime for edit
 
 Validated on Creator **3.8.8**, Docker Desktop (Windows), and a production **playable-ad** project with `library/` wiped and rebuilt entirely by our importers.
 
+Cursor / Agent：把这份 playbook URL 丢进对话即可在本机搭好预览（不装 Creator）：
+
+https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_SETUP.md
+
 ```bash
 git clone https://github.com/shinjiyu/headless-cocos.git
 cd headless-cocos
-# after engine snapshot — see Getting started
-PACKER=mini PORT=7460 PROJECT=/path/to/project \
-  ENGINE_SNAPSHOT=$PWD/spike/engine-snapshot \
-  node spike/preview-mirror.mjs
+# unzip headless-runtime-3.8.8 into runtime/3.8.8/  — see docs/runtime-kit.md
+node spike/bootstrap.mjs --out /path/to/my-game
+PACKER=mini PROJECT=/path/to/my-game node spike/preview-mirror.mjs
 ```
 
 ---
@@ -117,9 +120,8 @@ Deep dive: [docs/architecture.md](./docs/architecture.md)
 ### Prerequisites
 
 - Node.js **≥ 20**
-- Cocos Creator **3.8.8** (one-time, for engine snapshot)
-- A 3.8 project with `assets/`
-- Optional: Docker Desktop
+- Pinned **3.8.8 runtime kit** (`runtime/3.8.8/` — not a Creator install)
+- Optional: Docker Desktop (image already contains the kit)
 
 ### Clone
 
@@ -128,27 +130,24 @@ git clone https://github.com/shinjiyu/headless-cocos.git
 cd headless-cocos
 ```
 
-### One-time engine snapshot
+### Runtime kit (no Creator)
+
+Unzip the team’s `headless-runtime-3.8.8.zip` into `runtime/3.8.8/`, or:
 
 ```powershell
-npx @electron/asar extract `
-  "C:\ProgramData\cocos\editors\Creator\3.8.8\resources\app.asar" `
-  tmp-asar-root
-
-node .\spike\snapshot-from-creator.cjs
+$env:HEADLESS_RUNTIME_URL = "https://your-internal/headless-runtime-3.8.8.zip"
+node spike/fetch-runtime.mjs
 ```
 
-Details: [Getting started](./docs/getting-started.md)
+Details: [Runtime kit](./docs/runtime-kit.md)
 
 ### Run (mini mode)
 
 ```powershell
+node spike/bootstrap.mjs --out D:\tempWorkspace\my-game
 $env:PACKER = "mini"
-$env:PORT = "7460"
-$env:PROJECT = "D:\path\to\your-cocos-project"
-$env:ENGINE_SNAPSHOT = "$PWD\spike\engine-snapshot"
-$env:LAUNCH_SCENE = "Main"
-node .\spike\preview-mirror.mjs
+$env:PROJECT = "D:\tempWorkspace\my-game"
+node spike/preview-mirror.mjs
 ```
 
 Open **http://127.0.0.1:7460/**
@@ -221,7 +220,7 @@ node .\spike\e2e-bundle.cjs
 
 - **Creator 3.8.x only** (validated on 3.8.8)
 - Auto sprite trim emits untrimmed rects (no pixel decode)
-- Engine / `internal-library` snapshots are **not** in git (Cocos license). This checkout already has a pre-baked `spike/engine-snapshot/`; `preview-mirror` uses it automatically.
+- Engine / packer binaries are **not** in git (Cocos license). Ship `headless-runtime-3.8.8.zip` internally; do not ask users to install Creator.
 - 3D particles out of scope for the current 2D playable pipeline
 
 ---
