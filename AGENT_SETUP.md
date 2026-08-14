@@ -16,13 +16,11 @@
 ## 1. 克隆
 
 ```powershell
-git clone https://github.com/shinjiyu/headless-cocos.git $STACK
+hutao clone https://github.com/shinjiyu/headless-cocos.git $STACK
 cd $STACK
-git checkout feat/artist-preview-design
+hutao checkout feat/artist-preview-design
 npm install
 ```
-
-本机 git 被拦截时，全程改用 `hutao`。
 
 ## 2. 建工程
 
