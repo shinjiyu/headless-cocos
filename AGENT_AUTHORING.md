@@ -37,7 +37,15 @@ https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-de
 
 ## 加资源（图 / 音 / 字 / Spine / JSON…）
 
-1. 把文件放进 `assets/`（需要 `resources.load` 的放 `assets/resources/`）。
+1. 把文件放进 `assets/`（需要 `resources.load` 的放 `assets/resources/`）。网上的 CC0 模型用 assetsSrc 丢进 `assets/AssetPool/`，不要开 Creator：
+
+```powershell
+cd $SRC
+node tools/import-to-headless.mjs --project $GAME --id CheeseBox_01 --catalog https://onlyclaws.world/assets
+```
+
+`$SRC` 怎么算、不要抄盘符：https://onlyclaws.world/assets/USAGE.md
+
 2. **不要**手写 `.meta`（除非你在复用一个已有 uuid）。没有 meta 时预览会 mint；已有合法 uuid 不会被转。
 3. 等 HMR。图片会出 `SpriteFrame`（子资源 `@f9941`）。
 4. prefab / scene 里引用精灵：写
@@ -111,6 +119,13 @@ https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-de
 ```
 
 要 UI 叠加：自己加 Canvas（`_layer` `33554432`），别删 Main Camera / Main Light。
+
+网上的 CC0 模型不要经 Creator 导入。用 assetsSrc 目录拿到官方 URL，丢进 `assets/AssetPool/`，让预览 watch 导入：
+
+```powershell
+cd $SRC
+node tools/import-to-headless.mjs --project $GAME --id CheeseBox_01 --catalog https://onlyclaws.world/assets
+```
 
 ## ViewWeaver（必须会）
 
