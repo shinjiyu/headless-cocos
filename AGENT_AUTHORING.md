@@ -7,8 +7,8 @@
 
 https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_AUTHORING.md
 
-默认工程：`D:\tempWorkspace\my-game`（按实际 `PROJECT` 替换）。  
-预览：`http://127.0.0.1:7460/`。预览栈仓库根下跑 CLI。
+工程 = 用户工作区里的 Cocos 工程（`PROJECT`，不要默认成 `D:\tempWorkspace\my-game`）。  
+预览：`http://127.0.0.1:<PORT>/`（SETUP 里实际用的端口）。CLI 在预览栈仓库根（`STACK`）下跑。
 
 ## 总原则
 

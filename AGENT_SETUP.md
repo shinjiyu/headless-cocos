@@ -31,10 +31,19 @@
 ## 0. 前提
 
 - Node.js ≥ 20（没有就提示用户装 Node，**不是** Creator）
-- 工作目录自定；Windows 默认用 `D:\tempWorkspace`
+- **ROOT = 用户当前工作区**（本对话打开的目录，或用户点名的路径）。  
+  **禁止**擅自改用 `D:\tempWorkspace` / `my-game`，除非用户写了这两个字。
+- 记三个路径，后面命令全部用变量，不要抄示例里的盘符：
+
+| 变量 | 含义 | 算法 |
+|------|------|------|
+| `ROOT` | 用户工作区 | 当前 workspace；本例若用户在 `D:\workspace\nococos` 就用它 |
+| `STACK` | 预览栈仓库 | `ROOT` 里已有 `spike/preview-mirror.mjs` → `STACK=ROOT`；否则 `STACK=ROOT\headless-cocos`（clone 到这里） |
+| `GAME` | Cocos 工程 | 用户指定则用指定；否则 `GAME=ROOT\my-game`（在 **ROOT 下**，不在别的盘） |
 
 ```powershell
 node -v
+pwd   # 确认 ROOT，不要跳到 D:\tempWorkspace
 ```
 
 ## 1. 克隆预览栈
@@ -42,8 +51,9 @@ node -v
 若当前工作区已经是 `headless-cocos`（有 `spike/preview-mirror.mjs`），跳过 clone，在该根目录做后面的步骤。
 
 ```powershell
-git clone https://github.com/shinjiyu/headless-cocos.git
-cd headless-cocos
+# 在 ROOT 下执行。不要 cd 到 D:\tempWorkspace
+git clone https://github.com/shinjiyu/headless-cocos.git "$STACK"
+cd $STACK
 git checkout feat/artist-preview-design
 npm install
 ```
@@ -76,14 +86,15 @@ node -e "console.log(JSON.stringify(require('./spike/runtime-kit.cjs').kitStatus
 ## 3. 用模板建工程
 
 ```powershell
-node spike/bootstrap.mjs --out D:\tempWorkspace\my-game
+cd $STACK
+node spike/bootstrap.mjs --out $GAME
 ```
 
 `bootstrap` 会从 `templates/base-ai-headless` 拷一份（同源 [baseAIAutoCocos `headless`](https://github.com/shinjiyu/baseAIAutoCocos/tree/headless)）。  
 若第 2 步 kit 未就绪，`bootstrap` 会失败；改用：
 
 ```powershell
-node spike/create-project.mjs --template base-ai --out D:\tempWorkspace\my-game
+node spike/create-project.mjs --template base-ai --out $GAME
 ```
 
 工程里改 prefab / scene **直接改 JSON 文件**，不要找节点树 API。
@@ -93,39 +104,42 @@ node spike/create-project.mjs --template base-ai --out D:\tempWorkspace\my-game
 仅当 `kitStatus().ready === true`：
 
 ```powershell
+cd $STACK
 $env:PACKER = "mini"
-$env:PORT = "7460"
-$env:PROJECT = "D:\tempWorkspace\my-game"
+$env:PORT = "7460"    # 被占用就 +1，并告诉用户实际端口
+$env:PROJECT = $GAME  # 必须是上面建的工程，不是 STACK
 node spike/preview-mirror.mjs
 ```
 
 后台跑。日志必须有：
 
+- `PROJECT=` 等于 `$GAME`
 - `ENGINE_SNAPSHOT=...`（指向 kit / snapshot，**不是** `C:\ProgramData\cocos\...`）
 - `[mini] build#1 ok` 或同等成功
-- `http://127.0.0.1:7460`
+- `http://127.0.0.1:<PORT>`
 
-浏览器打开 http://127.0.0.1:7460/ （不要带 `autoReload=false`，否则收不到 HMR）。
+浏览器打开该地址（不要带 `autoReload=false`，否则收不到 HMR）。  
+`7460` 若已被别的 Docker / 旧 preview 占用，换端口，不要去复用别人的 7460。
 
 ## 5. 安装并读改工程知识（不要停在「环境好了」）
 
-`bootstrap` / `create-project` 已把知识拷进工程：
+`bootstrap` / `create-project` 已把知识拷进 **`$GAME`**：
 
-- `D:\tempWorkspace\my-game\AGENT_AUTHORING.md`
-- `D:\tempWorkspace\my-game\.cursor\skills\headless-authoring\SKILL.md`
+- `$GAME\AGENT_AUTHORING.md`
+- `$GAME\.cursor\skills\headless-authoring\SKILL.md`
 
-**立刻 Read 工程里的 `AGENT_AUTHORING.md`**，之后改 prefab / scene / 资源 / View 只跟这份走。不要靠 Creator MCP skill。
+**立刻 Read `$GAME\AGENT_AUTHORING.md`**，之后改 prefab / scene / 资源 / View 只跟这份走。不要靠 Creator MCP skill。
 
-若拷贝缺失（极旧模板），从本仓库根再拷一次：
+若拷贝缺失，从 `$STACK` 再拷一次：
 
 ```powershell
-Copy-Item .\AGENT_AUTHORING.md D:\tempWorkspace\my-game\AGENT_AUTHORING.md
+Copy-Item $STACK\AGENT_AUTHORING.md $GAME\AGENT_AUTHORING.md
 ```
 
-向用户交代：
+向用户交代（用真实路径，不要写 tempWorkspace 示例）：
 
-- 唯一入口已经跑完；以后新开对话打开的是 `my-game`，会带上 headless-authoring skill
-- 改 `assets/` → 自动补 `.meta`、打包、热更
+- 唯一入口已经跑完；以后打开的是 `$GAME`，会带上 headless-authoring skill
+- 改 `$GAME\assets\` → 自动补 `.meta`、打包、热更
 - 业务节点要 typed 访问 → bind + `POST /__viewweaver`
 
 ## 失败对照
@@ -136,3 +150,4 @@ Copy-Item .\AGENT_AUTHORING.md D:\tempWorkspace\my-game\AGENT_AUTHORING.md
 | `unknown template: base-ai` | 不在 `feat/artist-preview-design`，先 checkout |
 | 端口占用 | 换 `PORT` 或杀掉旧 `preview-mirror` |
 | 本机 `git push` 异常 | 全部改用 `hutao` |
+| 工程出现在 `D:\tempWorkspace\...` 但用户工作区不是那里 | 文案抄死了；停下来改用 ROOT，不要继续在错误目录装 |
