@@ -63,7 +63,9 @@ node tools/import-to-headless.mjs --project $GAME --id CheeseBox_01 --catalog ht
 
 ## 改 Prefab / Scene
 
-文件就是 JSON 数组。`__id__` 是**数组下标**，增删对象后必须重映射所有 `{ "__id__": n }`，否则树会断。
+文件就是 JSON 数组。`__id__` 是**整份数组的下标**，不是「第几个节点」。增删对象后必须重映射所有 `{ "__id__": n }`，否则树会断。
+
+3D `PreviewBoot.scene` 在 Cube 后面还有 PrefabInfo / SceneGlobals / Ambient / Shadows / Skybox / Fog / Octree / Skin / LightProbe / PostSettings。追加前先 `JSON.parse`，新对象的 `__id__` 从 `array.length` 起编。按节点数猜（比如当成 13）会踩到这些全局对象，运行时报 `this._children[i]._onBatchCreated is not a function`，`sceneName` 变 null。
 
 可以做：
 

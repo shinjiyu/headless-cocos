@@ -1231,9 +1231,12 @@ function resolveProjectAssetPath(fileParam) {
   return abs;
 }
 
+const gltfImportRetry = new Map();
+
 function importGltfLogged(absPath, label, options) {
   try {
     const r = importGltf(absPath, LIBRARY, options || {});
+    gltfImportRetry.delete(absPath);
     if (r && r.changed.length) {
       const variantNote =
         r.variants && r.variants.active != null
@@ -1251,6 +1254,15 @@ function importGltfLogged(absPath, label, options) {
     }
     return r;
   } catch (err) {
+    const msg = String(err && err.message ? err.message : err);
+    const n = (gltfImportRetry.get(absPath) || 0) + 1;
+    if (/ENOENT|no such file/i.test(msg) && n <= 8) {
+      gltfImportRetry.set(absPath, n);
+      setTimeout(() => importGltfLogged(absPath, label, options), 250);
+      console.warn('[gltf-import] wait-deps', label, msg);
+      return null;
+    }
+    gltfImportRetry.delete(absPath);
     console.warn('[gltf-import] failed', label, err.message);
     return null;
   }
