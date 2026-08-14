@@ -47,7 +47,10 @@ function normalize(p) {
   return /^[a-z]:/.test(r) ? r[0].toUpperCase() + r.slice(1) : r;
 }
 
-const { resolveNpmRoot, resolveUuidUtil, kitMissingHelp } = require('../runtime-kit.cjs');
+const { resolveNpmRoot, resolveUuidUtil, resolveEngineSnapshot, kitMissingHelp } = require('../runtime-kit.cjs');
+
+const BUILTIN_PIPELINE_URL =
+  'file:///C:/ProgramData/cocos/editors/Creator/3.8.8/resources/resources/3d/engine/editor/assets/default_renderpipeline/builtin-pipeline.ts';
 
 const PROJECT = normalize(
   args.project ||
@@ -187,8 +190,28 @@ function buildCcModuleSource(ccFu) {
 }
 
 function buildPrereqModuleSource(urls) {
-  if (!urls.length) return 'export {};\n';
-  return urls.map((u) => `import '${u}';`).join('\n') + '\n';
+  const all = [BUILTIN_PIPELINE_URL, ...urls];
+  return all.map((u) => `import '${u}';`).join('\n') + '\n';
+}
+
+function applyPackerSeed(outDir) {
+  const engine = resolveEngineSnapshot();
+  const seed = engine ? path.join(engine, 'packer-seed') : '';
+  const seedMapPath = path.join(seed, 'import-map.json');
+  if (!seed || !fs.existsSync(seedMapPath)) return 0;
+  const seedChunks = path.join(seed, 'chunks');
+  if (fs.existsSync(seedChunks)) {
+    fs.cpSync(seedChunks, path.join(outDir, 'chunks'), { recursive: true, force: false });
+  }
+  const seedMap = JSON.parse(fs.readFileSync(seedMapPath, 'utf8'));
+  const destMapPath = path.join(outDir, 'import-map.json');
+  const dest = fs.existsSync(destMapPath)
+    ? JSON.parse(fs.readFileSync(destMapPath, 'utf8'))
+    : { imports: {}, scopes: {} };
+  dest.imports = { ...seedMap.imports, ...(dest.imports || {}) };
+  dest.scopes = { ...seedMap.scopes, ...(dest.scopes || {}) };
+  fs.writeFileSync(destMapPath, `${JSON.stringify(dest, null, 2)}\n`);
+  return Object.keys(seedMap.imports || {}).length;
 }
 
 function moduleUrlFor(realAbsPath) {
@@ -245,7 +268,12 @@ async function build() {
     logger,
   });
   const ccFu = readProjectCcFu(PROJECT);
-  modLo.setExternals(['cc', ...ccFu.map((n) => `cce:/internal/x/cc-fu/${n}`)]);
+  modLo.setExternals([
+    'cc',
+    'cc/env',
+    BUILTIN_PIPELINE_URL,
+    ...ccFu.map((n) => `cce:/internal/x/cc-fu/${n}`),
+  ]);
   modLo.addMemoryModule(CR_MODULE_URL, CR_MODULE_SOURCE);
   modLo.addMemoryModule(CC_MODULE_URL, buildCcModuleSource(ccFu));
   const files = await collectScripts(ASSETS);
@@ -270,12 +298,14 @@ async function build() {
   const entries = [CC_MODULE_URL, PREREQ_MODULE_URL, ...files.map((f) => moduleUrlFor(f))];
   const t0 = Date.now();
   const res = await packer.build(entries);
+  const seeded = applyPackerSeed(OUT);
   const dt = Date.now() - t0;
   return {
     ms: dt,
     scripts: files.length,
     scriptsWithUuid: uuidMap.size,
     depsGraphSize: Object.keys(res.depsGraph).length,
+    seeded,
   };
 }
 
