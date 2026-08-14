@@ -2,19 +2,20 @@
 
 给无头预览用的工程壳。不是官方 Empty（没有 `assets/`），也不是 PA 盘面。
 
-默认模板 **base-ai**：[baseAIAutoCocos](https://github.com/shinjiyu/baseAIAutoCocos) 的无头版。
+默认模板 **base-ai** 是 **2D** 壳（Canvas + 正交相机）。3D 用 **base-ai-3d**（同一套 ViewWeaver，覆盖启动场景和 `engine.json`）。
 
 | | |
 |--|--|
 | 有 | ViewWeaver、3.8.8 `settings/`、可启动 `PreviewBoot`、`resources` bundle |
 | 无 | MCP、`cocos-meta-mcp`、Board / MainUI / CTA |
-| 改 UI | 直接改 `assets/**/*.prefab` / `.scene` JSON，磁盘即真相 |
+| 改场景 | 直接改 `assets/**/*.prefab` / `.scene` JSON，磁盘即真相 |
 | 引擎 | 预埋在版本包 `runtime/3.8.8/`，预览只认这个包，不装 Creator |
 
 对外发布的工程壳：[baseAIAutoCocos `headless` 分支](https://github.com/shinjiyu/baseAIAutoCocos/tree/headless)（不同场景用不同分支）。
 
 ```powershell
 node spike/create-project.mjs --template base-ai --out D:\tempWorkspace\my-game
+node spike/create-project.mjs --template base-ai-3d --out D:\tempWorkspace\my-3d-game
 $env:PROJECT="D:\tempWorkspace\my-game"
 $env:PACKER="mini"
 node spike/preview-mirror.mjs

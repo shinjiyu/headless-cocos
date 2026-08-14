@@ -8,8 +8,10 @@ Cocos Creator **3.8.8** AI tooling base for **headless** preview.
 |----|----|
 | ViewWeaver（`extensions/viewweaver` → `assets/scripts/views/`） | `cocos-meta-mcp` / 任何 MCP |
 | 3.8.8 `settings/` | Board / MainUI / CTA / symbol-library |
-| 可启动 `assets/scene/PreviewBoot.scene`（Canvas + Camera） | 官方 Empty 那种「要 IDE 第一次打开才长 assets」 |
+| 可启动 `assets/scene/PreviewBoot.scene`（**2D** Canvas + 正交 Camera） | 官方 Empty 那种「要 IDE 第一次打开才长 assets」 |
 | `assets/resources`（`isBundle`） | Creator preview-refresh skills |
+
+这是 **2D** 默认壳。3D 用 `--template base-ai-3d`。
 
 改 UI：直接改 `assets/**/*.prefab` / `.scene`。磁盘是唯一真相，无头栈 watch 后进 `library/` 并 HMR。
 

@@ -54,7 +54,13 @@ function resolveBaseAiDir() {
 const TEMPLATES = {
   'base-ai': {
     dir: resolveBaseAiDir(),
-    note: 'baseAIAutoCocos headless: ViewWeaver + boot scene, no MCP. Default.',
+    note: '2D default: ViewWeaver + Canvas boot scene, no MCP.',
+    stripMcp: true,
+  },
+  'base-ai-3d': {
+    dir: resolveBaseAiDir(),
+    overlay: path.join(REPO, 'templates/base-ai-headless-3d'),
+    note: '3D: same shell, perspective camera + light + sample Cube.',
     stripMcp: true,
   },
   'pa-mini': {
@@ -169,6 +175,7 @@ function printHelp() {
       '',
       'Usage:',
       '  node spike/create-project.mjs --template base-ai --out <dir>',
+      '  node spike/create-project.mjs --template base-ai-3d --out <dir>',
       '  node spike/create-project.mjs --from <existing-project> --out <dir> [--no-mcp]',
       '  node spike/create-project.mjs --list',
       '',
@@ -210,6 +217,13 @@ function main() {
 
   fs.mkdirSync(dest, { recursive: true });
   const stats = copyTree(src, dest);
+  const overlay = !args.from && TEMPLATES[args.template]?.overlay;
+  if (overlay) {
+    if (!fs.existsSync(overlay)) {
+      throw new Error(`template overlay missing: ${overlay}`);
+    }
+    copyTree(overlay, dest);
+  }
   const stripMcp = args.noMcp || Boolean(TEMPLATES[args.template]?.stripMcp);
   if (stripMcp) stripMcpTree(dest);
   const knowledge = installAgentKnowledge(dest);

@@ -18,11 +18,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const out = { dest: '', name: '' };
+  const out = { dest: '', name: '', template: 'base-ai' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--out') out.dest = argv[++i];
     else if (a === '--name') out.name = argv[++i];
+    else if (a === '--template') out.template = argv[++i];
     else if (a === '--help' || a === '-h') out.help = true;
     else if (!a.startsWith('-') && !out.dest) out.dest = a;
   }
@@ -34,7 +35,8 @@ function main() {
   if (args.help || !args.dest) {
     process.stdout.write(
       'Create a headless Cocos project and verify the 3.8.8 runtime kit.\n\n' +
-        '  node spike/bootstrap.mjs --out D:\\tempWorkspace\\my-game\n',
+        '  node spike/bootstrap.mjs --out D:\\tempWorkspace\\my-game\n' +
+        '  node spike/bootstrap.mjs --template base-ai-3d --out D:\\tempWorkspace\\my-game\n',
     );
     if (!args.dest) process.exit(args.help ? 0 : 1);
     return;
@@ -51,7 +53,7 @@ function main() {
     [
       path.join(__dirname, 'create-project.mjs'),
       '--template',
-      'base-ai',
+      args.template || 'base-ai',
       '--out',
       path.resolve(args.dest),
       ...(args.name ? ['--name', args.name] : []),

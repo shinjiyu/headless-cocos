@@ -31,6 +31,23 @@
         "Creator MCP skills",
         "Board / MainUI / CTA / symbol-library"
       ]
+    },
+    {
+      "id": "base-ai-3d",
+      "dir": "templates/base-ai-headless-3d",
+      "overlayOn": "base-ai",
+      "default": false,
+      "mcp": false,
+      "viewweaver": true,
+      "launchScene": "PreviewBoot",
+      "includes": [
+        "base-ai shell",
+        "3D PreviewBoot (Main Camera + Main Light + Cube)",
+        "engine.json 3d + primitive"
+      ],
+      "excludes": [
+        "2D Canvas boot camera"
+      ]
     }
   ]
 }

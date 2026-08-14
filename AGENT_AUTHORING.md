@@ -19,9 +19,11 @@ https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-de
 
 ## 目录约定（`base-ai` 壳）
 
+默认 **base-ai** 是 2D 壳。3D 工程用 SETUP 的 `--template base-ai-3d`（透视相机 + 灯 + 示例 Cube）。
+
 | 路径 | 用途 |
 |------|------|
-| `assets/scene/PreviewBoot.scene` | 启动场景（Canvas + Camera） |
+| `assets/scene/PreviewBoot.scene` | 启动场景（2D：Canvas + Camera；3D：Main Camera + Main Light + Cube） |
 | `assets/prefabs/` | 业务 Prefab |
 | `assets/resources/` | 可 `resources.load` 的 bundle（已标 `isBundle`） |
 | `assets/scripts/views/<Name>/` | ViewWeaver 产出（本工程是 viewweaver，不是 `_genbot`） |
@@ -70,6 +72,45 @@ https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-de
 - 为官方 Empty / MCP `create-node` 找场景 API——无头没有。磁盘改文件就是正路
 
 启动场景默认是 `PreviewBoot`。往场景里加常驻 UI：改 `PreviewBoot.scene`，或在脚本里 `resources.load` prefab 再实例化。
+
+## 3D（`--template base-ai-3d`）
+
+2D 壳没有灯、ambient 全黑、`engine.json` 关掉了 `3d`。不要在 2D 工程里硬塞 `MeshRenderer`——白盒子会渲成黑的。
+
+3D 模板已经有：透视 `Main Camera`、`Main Light`、非黑 ambient、示例 `Cube`。再加网格时 **写死这些 UUID**，不要翻 `internal-library/`：
+
+| 资源 | UUID |
+|------|------|
+| box mesh | `1263d74c-8167-4928-91a6-4e2672411f47@a804a` |
+| sphere | `1263d74c-8167-4928-91a6-4e2672411f47@17020` |
+| plane | `1263d74c-8167-4928-91a6-4e2672411f47@2e76e` |
+| capsule | `1263d74c-8167-4928-91a6-4e2672411f47@801ec` |
+| cone | `1263d74c-8167-4928-91a6-4e2672411f47@38fd2` |
+| cylinder | `1263d74c-8167-4928-91a6-4e2672411f47@8abdc` |
+| torus | `1263d74c-8167-4928-91a6-4e2672411f47@40ece` |
+| quad | `1263d74c-8167-4928-91a6-4e2672411f47@fc873` |
+| builtin-standard | `620b6bf3-0369-4560-837f-2a2c00b73c26` |
+
+`a3cd009f-…` 是 **unlit EffectAsset**，不是 Material。栈没有 `.material` importer，不要自己造材质文件。要看得见：留着灯，或保持 ambient 非黑。`builtin-standard` 没光就是黑的。
+
+子资源 URL 带后缀（`@a804a.json`），不要只请求 prefab 主 uuid。
+
+追加节点示例（挂到 Scene `_children`，`_layer` 用 `1073741824`）：
+
+```json
+"_mesh": {
+  "__uuid__": "1263d74c-8167-4928-91a6-4e2672411f47@a804a",
+  "__expectedType__": "cc.Mesh"
+},
+"_materials": [
+  {
+    "__uuid__": "620b6bf3-0369-4560-837f-2a2c00b73c26",
+    "__expectedType__": "cc.Material"
+  }
+]
+```
+
+要 UI 叠加：自己加 Canvas（`_layer` `33554432`），别删 Main Camera / Main Light。
 
 ## ViewWeaver（必须会）
 
