@@ -37,6 +37,10 @@ Cursor / Agent：把这份 playbook URL 丢进对话即可在本机搭好预览�
 
 https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_SETUP.md
 
+改工程知识（ViewWeaver / prefab / 资源）：
+
+https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_AUTHORING.md
+
 ```bash
 git clone https://github.com/shinjiyu/headless-cocos.git
 cd headless-cocos

@@ -106,9 +106,12 @@ node spike/preview-mirror.mjs
 
 ## 5. 告诉用户怎么接着干
 
+改工程（prefab / scene / 资源 / ViewWeaver）按这份知识，不要靠 MCP skill：
+
+https://raw.githubusercontent.com/shinjiyu/headless-cocos/feat/artist-preview-design/AGENT_AUTHORING.md
+
 - 改 `D:\tempWorkspace\my-game\assets\` → 自动补 `.meta`、打包、热更
-- ViewWeaver：`POST http://127.0.0.1:7460/__viewweaver`  
-  或 `node spike/viewweaver-host.mjs --project D:\tempWorkspace\my-game <Prefab名>`
+- 业务节点要 typed 访问 → bind + `POST /__viewweaver`
 - 不要开 Creator，不要 MCP
 
 ## 失败对照

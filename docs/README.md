@@ -15,6 +15,7 @@ Technical docs for **headless-cocos** (Creator 3.8 headless preview).
 | [base-ai-headless.md](base-ai-headless.md) | Operators | Create shell: ViewWeaver, no MCP |
 | [runtime-kit.md](runtime-kit.md) | Operators | Pinned 3.8.8 engine+packer (no Creator) |
 | [../AGENT_SETUP.md](../AGENT_SETUP.md) | Cursor / Agent | Paste this URL to bootstrap a local preview |
+| [../AGENT_AUTHORING.md](../AGENT_AUTHORING.md) | Cursor / Agent | Prefab / scene / assets / ViewWeaver rules |
 | [real-project-boot.md](real-project-boot.md) | Contributors | Lessons from production project boot |
 | [headless-cocos-final.md](headless-cocos-final.md) | Archive | Earlier milestone write-up (partially superseded) |
 
