@@ -72,6 +72,7 @@ function reqCoc(rel) {
 }
 const { QuickPack } = reqCoc('@cocos/creator-programming-quick-pack/lib/quick-pack');
 const { ModLo } = reqCoc('@cocos/creator-programming-mod-lo/lib/mod-lo');
+const { ensureAssetMeta } = require('../importers/ensure-meta.cjs');
 
 // Swap mod-lo's plugin-detect-circular for our context-safe re-implementation
 // (the original crashes with "Couldn't find a Program" when invoked outside
@@ -154,12 +155,16 @@ function moduleUrlFor(realAbsPath) {
 
 async function readUuidMap(files) {
   const map = new Map();
+  let minted = 0;
   await Promise.all(files.map(async (f) => {
     try {
+      const ensured = ensureAssetMeta(f, { assetsRoot: ASSETS });
+      if (ensured?.minted) minted += 1;
       const meta = JSON.parse(await fs.promises.readFile(f + '.meta', 'utf8'));
       if (meta && meta.uuid) map.set(moduleUrlFor(f), meta.uuid);
     } catch {}
   }));
+  if (minted) console.log(`[mini-packer] minted ${minted} missing script .meta`);
   return map;
 }
 

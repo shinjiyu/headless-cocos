@@ -34,12 +34,12 @@ Incremental: asset watcher in `PACKER=mini` mode.
 | `.txt` `.csv` `.yaml` `.yml` `.conf` `.md` | `importers/text.cjs` | `TextAsset` | |
 | Plain `.json` (no `__type__`) | mirror `importJsonAsset` | `JsonAsset` | Wraps `{ json: … }` |
 | Spine JSON | spine importer | `SkeletonData` | Detected via `isSpineJson` |
-| `.prefab` `.scene` `.anim` `.animgraph` `.mtl` | sync copy | same JSON | Creator already stores preview form as JSON/CCON |
+| `.prefab` `.scene` `.anim` `.animgraph` `.mtl` | sync copy | same JSON | Missing `.meta` is minted then copied into `library/` |
 | Serialized `.json` with `__type__` | sync copy | as-is | |
 
 ## Design rules
 
-1. **Respect `.meta` uuids** — never regenerate project uuids; scenes/prefabs depend on them.
+1. **Respect `.meta` uuids** — never regenerate project uuids; scenes/prefabs depend on them. If a `.prefab` / `.scene` / `.anim` / `.mtl` / `.json` / `.ts` / `.js` / `.atlas` / folder has **no** meta, `importers/ensure-meta.cjs` mints one (random uuid, Creator-shaped importer) and also mints ancestor folder metas. `assets/resources` gets `userData.isBundle`. Existing valid metas are left untouched.
 2. **Match Creator preview products**, not necessarily build-pipeline compressed textures.
 3. **Idempotent writes** — skip disk write when content unchanged (avoids watch echo).
 4. **No pixel decode for auto-trim** — `trimType: auto` metas often hold stale rects; emit full image rect (transparent padding is visually equivalent). Honor `trimType: custom` when dimensions still match.
@@ -96,6 +96,7 @@ Wrong index → 404 (`…uuid.png` requested for a `.jpg` file).
 | `spike/e2e-anim-text.cjs` | AnimationClip + AnimationGraph + TextAsset |
 | `spike/e2e-bundle.cjs` | Custom bundle loadBundle + path load |
 | `spike/e2e-prefab.cjs` / `e2e-scene-*.cjs` | Prefab / scene sync |
+| `spike/e2e-ensure-meta.cjs` | Mint missing prefab / scene / ts / json / atlas / folder `.meta` |
 
 ## Known gaps
 

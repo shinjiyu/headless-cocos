@@ -27,6 +27,13 @@ import textImporter from './importers/text.cjs';
 import gltfImporter from './importers/gltf.cjs';
 import fbxImporter from './importers/fbx.cjs';
 import polyhavenImporter from './importers/polyhaven.cjs';
+import ensureMetaImporter from './importers/ensure-meta.cjs';
+import {
+  generatePrefab as viewweaverGenerate,
+  generateAll as viewweaverGenerateAll,
+  matchRegistryAsset,
+  status as viewweaverStatus,
+} from './viewweaver-host.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
@@ -75,6 +82,7 @@ const BUILD_DEBOUNCE_MS = Number(process.env.BUILD_DEBOUNCE_MS || 150);
 const WATCH_POLL = process.env.WATCH_POLL && process.env.WATCH_POLL !== '0';
 const WATCH_POLL_MS = Number(process.env.WATCH_POLL_MS || 1000);
 const { IMAGE_EXTS, importImage } = imageImporter;
+const { ensureAssetMeta, ensureFolderMeta, ensureAncestorFolders } = ensureMetaImporter;
 const { AUDIO_EXTS, importAudio } = audioImporter;
 const { FONT_EXTS, importFont } = fontImporter;
 const { BMFONT_EXTS, importBMFont } = bmfontImporter;
@@ -1046,6 +1054,69 @@ function scheduleMiniBuild(reason) {
   buildTimer = setTimeout(() => runMiniBuild(reason), BUILD_DEBOUNCE_MS);
 }
 
+const VIEWWEAVER_AUTO = process.env.VIEWWEAVER !== '0';
+const VIEWWEAVER_DEBOUNCE_MS = Number(process.env.VIEWWEAVER_DEBOUNCE_MS || 250);
+const viewweaverTimers = new Map();
+
+function scheduleViewweaver(prefabName, reason) {
+  if (!VIEWWEAVER_AUTO || !prefabName) return;
+  const prev = viewweaverTimers.get(prefabName);
+  if (prev) clearTimeout(prev);
+  viewweaverTimers.set(
+    prefabName,
+    setTimeout(() => {
+      viewweaverTimers.delete(prefabName);
+      runViewweaver(prefabName, reason);
+    }, VIEWWEAVER_DEBOUNCE_MS),
+  );
+}
+
+async function runViewweaver(target, reason) {
+  console.log(`[viewweaver] generate ${target} (${reason})`);
+  const result = await viewweaverGenerate(PROJECT, target);
+  if (result.ok) {
+    console.log(`[viewweaver] ok ${result.prefab} via ${result.tool}`);
+    scheduleMiniBuild(`viewweaver:${result.prefab}`);
+  } else {
+    console.warn(`[viewweaver] failed ${target}: ${result.error || result.log || 'unknown'}`);
+  }
+  return result;
+}
+
+function maybeViewweaverFromAsset(rel) {
+  if (!VIEWWEAVER_AUTO) return;
+  const hit = matchRegistryAsset(PROJECT, rel);
+  if (hit?.prefabName) scheduleViewweaver(hit.prefabName, rel);
+}
+
+function readJsonBody(req, limit = 1e6) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let n = 0;
+    req.on('data', (c) => {
+      n += c.length;
+      if (n > limit) {
+        reject(new Error('body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      if (!chunks.length) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 // ---- Mini asset-db: sync JSON-only assets (scene/prefab/anim/mtl…) into library ----
 // Creator, for these types, essentially copies the file to library/<xx>/<uuid>.json.
 // We replicate that on save so AI can edit assets/*.prefab directly.
@@ -1071,13 +1142,12 @@ function classifyJson(absPath) {
 }
 
 function importJsonAsset(absPath, parsed) {
-  const metaPath = absPath + '.meta';
-  if (!fs.existsSync(metaPath)) return null;
-  let uuid;
-  try {
-    uuid = JSON.parse(fs.readFileSync(metaPath, 'utf8')).uuid;
-  } catch { return null; }
-  if (!uuid || !/^[0-9a-fA-F-]{36}$/.test(uuid)) return null;
+  const ensured = ensureAssetMeta(absPath, { assetsRoot: ASSETS });
+  if (!ensured) return null;
+  if (ensured.minted) {
+    console.log('[ensure-meta]', path.relative(PROJECT, absPath), '→', ensured.uuid);
+  }
+  const uuid = ensured.uuid;
   const libDir = path.join(LIBRARY, uuid.slice(0, 2));
   const libPath = path.join(libDir, `${uuid}.json`);
   const wrapped = JSON.stringify({
@@ -1187,13 +1257,13 @@ function importFbxLogged(absPath, label) {
 function syncAssetToLibrary(assetAbsPath) {
   const ext = path.extname(assetAbsPath).toLowerCase();
   if (!SYNC_EXTS.has(ext)) return null;
-  const metaPath = assetAbsPath + '.meta';
-  if (!fs.existsSync(metaPath)) return null;
-  let uuid;
-  try {
-    uuid = JSON.parse(fs.readFileSync(metaPath, 'utf8')).uuid;
-  } catch { return null; }
-  if (!uuid || !/^[0-9a-fA-F-]{36}$/.test(uuid)) return null;
+  if (!fs.existsSync(assetAbsPath)) return null;
+  const ensured = ensureAssetMeta(assetAbsPath, { assetsRoot: ASSETS });
+  if (!ensured) return null;
+  if (ensured.minted) {
+    console.log('[ensure-meta]', path.relative(PROJECT, assetAbsPath), '→', ensured.uuid);
+  }
+  const uuid = ensured.uuid;
   const libDir = path.join(LIBRARY, uuid.slice(0, 2));
   const libPath = path.join(libDir, `${uuid}.json`);
   try {
@@ -1211,109 +1281,151 @@ function syncAssetToLibrary(assetAbsPath) {
     return null;
   }
 }
+function relAssets(absPath) {
+  return path.relative(ASSETS, absPath).replace(/\\/g, '/');
+}
+
+function ingestChanged(r) {
+  if (!r) return null;
+  if (Array.isArray(r.changed)) return r.changed.length > 0;
+  if (typeof r.changed === 'boolean') return r.changed;
+  if (r.minted) return true;
+  return false;
+}
+
+/** One ingest path for boot + watch. Scripts only mint meta; packer compiles. */
+function ingestSourceAsset(absPath, opts = {}) {
+  if (!absPath || !fs.existsSync(absPath)) return null;
+  let st;
+  try {
+    st = fs.statSync(absPath);
+  } catch {
+    return null;
+  }
+  const rel = relAssets(absPath);
+  if (st.isDirectory()) {
+    const r = ensureFolderMeta(absPath, { assetsRoot: ASSETS });
+    if (r?.minted) console.log('[ensure-meta]', `${rel}/`, '→', r.uuid);
+    return r;
+  }
+  if (/\.d\.ts$/.test(absPath)) return null;
+
+  ensureAncestorFolders(absPath, ASSETS);
+  const ext = path.extname(absPath).toLowerCase();
+
+  if (ext === '.ts' || ext === '.js') {
+    const r = ensureAssetMeta(absPath, { assetsRoot: ASSETS });
+    if (r?.minted) console.log('[ensure-meta]', rel, '→', r.uuid);
+    return r;
+  }
+  if (ext === '.atlas') {
+    const r = ensureAssetMeta(absPath, { assetsRoot: ASSETS });
+    if (r?.minted) console.log('[ensure-meta]', rel, '→', r.uuid);
+    if (opts.reimportAtlasSibling) {
+      const base = absPath.slice(0, -'.atlas'.length);
+      const sibling = fs.existsSync(`${base}.json`) ? `${base}.json` : `${base}.skel`;
+      if (fs.existsSync(sibling)) importSpineLogged(sibling, rel);
+    }
+    return r;
+  }
+
+  const wrap = (fn, tag) => {
+    try {
+      return fn();
+    } catch (err) {
+      console.warn(`[${tag}] failed`, rel, err.message);
+      return null;
+    }
+  };
+
+  if (IMAGE_EXTS.has(ext)) {
+    return wrap(() => {
+      const r = importImage(absPath, LIBRARY);
+      if (r && r.changed.length) {
+        console.log('[image-import]', rel, `${r.width}x${r.height}`, `→ ${r.spriteFrameUuid}`);
+      }
+      return r;
+    }, 'image-import');
+  }
+  if (AUDIO_EXTS.has(ext)) {
+    return wrap(() => {
+      const r = importAudio(absPath, LIBRARY);
+      if (r && r.changed.length) console.log('[audio-import]', rel, `→ ${r.uuid}${r.ext}`);
+      return r;
+    }, 'audio-import');
+  }
+  if (FONT_EXTS.has(ext)) {
+    return wrap(() => {
+      const r = importFont(absPath, LIBRARY);
+      if (r && r.changed.length) console.log('[font-import]', rel, `→ ${r.uuid}/${r.nativeName}`);
+      return r;
+    }, 'font-import');
+  }
+  if (BMFONT_EXTS.has(ext)) {
+    return wrap(() => {
+      const r = importBMFont(absPath, LIBRARY);
+      if (r && r.changed.length) console.log('[bmfont-import]', rel, `chars=${r.chars}`, `→ ${r.uuid}`);
+      return r;
+    }, 'bmfont-import');
+  }
+  if (ext === '.skel') return importSpineLogged(absPath, rel);
+  if (PLIST_EXTS.has(ext)) return importPlistLogged(absPath, rel);
+  if (GLTF_EXTS.has(ext)) return importGltfLogged(absPath, rel);
+  if (FBX_EXTS.has(ext)) return importFbxLogged(absPath, rel);
+  if (TEXT_EXTS.has(ext)) {
+    return wrap(() => {
+      const r = importText(absPath, LIBRARY);
+      if (r && r.changed.length) console.log('[text-import]', rel, `→ ${r.uuid}`);
+      return r;
+    }, 'text-import');
+  }
+  if (SYNC_EXTS.has(ext)) {
+    if (ext === '.json') {
+      const cls = classifyJson(absPath);
+      if (cls.kind === 'spine') return importSpineLogged(absPath, rel, cls.parsed);
+      if (cls.kind === 'skip') return null;
+      if (cls.kind === 'json') {
+        const r = importJsonAsset(absPath, cls.parsed);
+        if (r && r.changed) console.log('[json-import]', rel, '→', path.relative(PROJECT, r.libPath));
+        return r;
+      }
+    }
+    const r = syncAssetToLibrary(absPath);
+    if (r && r.changed) console.log('[asset-sync]', rel, '→', path.relative(PROJECT, r.libPath));
+    return r;
+  }
+  return null;
+}
+
 function bootSyncAssets() {
-  let synced = 0, skipped = 0, images = 0;
+  let synced = 0;
+  let skipped = 0;
+  let images = 0;
   function walk(dir) {
+    const folder = ensureFolderMeta(dir, { assetsRoot: ASSETS });
+    if (folder?.minted) {
+      console.log('[ensure-meta]', `${relAssets(dir)}/`, '→', folder.uuid);
+      synced++;
+    }
     let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const e of entries) {
       const p = path.join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (IMAGE_EXTS.has(path.extname(e.name).toLowerCase())) {
-        try {
-          const r = importImage(p, LIBRARY);
-          if (r) {
-            images++;
-            r.changed.length ? synced++ : skipped++;
-          }
-        } catch (err) {
-          console.warn('[image-import] boot failed', path.relative(ASSETS, p), err.message);
-        }
-      } else if (AUDIO_EXTS.has(path.extname(e.name).toLowerCase())) {
-        try {
-          const r = importAudio(p, LIBRARY);
-          if (r) {
-            images++;
-            r.changed.length ? synced++ : skipped++;
-          }
-        } catch (err) {
-          console.warn('[audio-import] boot failed', path.relative(ASSETS, p), err.message);
-        }
-      } else if (FONT_EXTS.has(path.extname(e.name).toLowerCase())) {
-        try {
-          const r = importFont(p, LIBRARY);
-          if (r) {
-            images++;
-            r.changed.length ? synced++ : skipped++;
-          }
-        } catch (err) {
-          console.warn('[font-import] boot failed', path.relative(ASSETS, p), err.message);
-        }
-      } else if (BMFONT_EXTS.has(path.extname(e.name).toLowerCase())) {
-        try {
-          const r = importBMFont(p, LIBRARY);
-          if (r) {
-            images++;
-            r.changed.length ? synced++ : skipped++;
-          }
-        } catch (err) {
-          console.warn('[bmfont-import] boot failed', path.relative(ASSETS, p), err.message);
-        }
-      } else if (path.extname(e.name).toLowerCase() === '.skel') {
-        const r = importSpineLogged(p, path.relative(ASSETS, p));
-        if (r) {
-          images++;
-          r.changed.length ? synced++ : skipped++;
-        }
-      } else if (PLIST_EXTS.has(path.extname(e.name).toLowerCase())) {
-        const r = importPlistLogged(p, path.relative(ASSETS, p));
-        if (r) {
-          images++;
-          r.changed.length ? synced++ : skipped++;
-        }
-      } else if (GLTF_EXTS.has(path.extname(e.name).toLowerCase())) {
-        const r = importGltfLogged(p, path.relative(ASSETS, p));
-        if (r) {
-          images++;
-          r.changed.length ? synced++ : skipped++;
-        }
-      } else if (FBX_EXTS.has(path.extname(e.name).toLowerCase())) {
-        const r = importFbxLogged(p, path.relative(ASSETS, p));
-        if (r) {
-          images++;
-          r.changed.length ? synced++ : skipped++;
-        }
-      } else if (TEXT_EXTS.has(path.extname(e.name).toLowerCase())) {
-        try {
-          const r = importText(p, LIBRARY);
-          if (r) {
-            images++;
-            r.changed.length ? synced++ : skipped++;
-          }
-        } catch (err) {
-          console.warn('[text-import] boot failed', path.relative(ASSETS, p), err.message);
-        }
-      } else if (SYNC_EXTS.has(path.extname(e.name).toLowerCase())) {
-        if (path.extname(e.name).toLowerCase() === '.json') {
-          const cls = classifyJson(p);
-          if (cls.kind === 'spine') {
-            const r = importSpineLogged(p, path.relative(ASSETS, p), cls.parsed);
-            if (r) {
-              images++;
-              r.changed.length ? synced++ : skipped++;
-            }
-            continue;
-          }
-          if (cls.kind === 'skip') continue;
-          if (cls.kind === 'json') {
-            const r = importJsonAsset(p, cls.parsed);
-            if (r) r.changed ? synced++ : skipped++;
-            continue;
-          }
-        }
-        const r = syncAssetToLibrary(p);
-        if (r) r.changed ? synced++ : skipped++;
+      if (e.isDirectory()) {
+        walk(p);
+        continue;
       }
+      const r = ingestSourceAsset(p, { reimportAtlasSibling: false });
+      if (!r) continue;
+      const changed = ingestChanged(r);
+      if (changed === null) continue;
+      if (changed) synced++;
+      else skipped++;
+      if (r.width != null || r.ext || r.pages || r.nativeName) images++;
     }
   }
   walk(ASSETS);
@@ -1468,6 +1580,37 @@ const server = http.createServer(async (req, res) => {
       'hmr'
     );
     return;
+  }
+
+  {
+    const u = new URL(urlPath, 'http://127.0.0.1');
+    if (u.pathname === '/__viewweaver' || u.pathname === '/__viewweaver/status') {
+      if (req.method === 'GET') {
+        send(
+          res,
+          200,
+          JSON.stringify({ ok: true, auto: VIEWWEAVER_AUTO, ...viewweaverStatus(PROJECT) }),
+          'application/json; charset=utf-8',
+          'viewweaver',
+        );
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = {};
+        try {
+          body = await readJsonBody(req);
+        } catch (e) {
+          send(res, 400, JSON.stringify({ ok: false, error: String(e.message || e) }), 'application/json; charset=utf-8', 'viewweaver');
+          return;
+        }
+        const target = body.prefab || body.prefabPath || body.uuid || u.searchParams.get('prefab');
+        const result = body.all
+          ? await viewweaverGenerateAll(PROJECT, { regenBind: !!body.regenBind })
+          : await runViewweaver(target, 'http');
+        send(res, result.ok ? 200 : 422, JSON.stringify(result), 'application/json; charset=utf-8', 'viewweaver');
+        return;
+      }
+    }
   }
 
   // Spawn queue: GET /__spawn-pending (oneshot)
@@ -1729,126 +1872,12 @@ server.listen(PORT, async () => {
       // Custom watcher on assets: TS/JS → mini-build; JSON assets → sync to library
       const onAssetChange = (name) => {
         if (!name) return;
-        if (/\.d\.ts$/.test(name)) return;
-        if (/\.(ts|js)$/.test(name)) {
-          scheduleMiniBuild(name);
-          return;
-        }
-        const rel = name.replace(/\.meta$/, '');
-        const ext = path.extname(rel).toLowerCase();
-        if (IMAGE_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (!fs.existsSync(abs)) return;
-          try {
-            const r = importImage(abs, LIBRARY);
-            if (r && r.changed.length) {
-              console.log(
-                '[image-import]',
-                rel,
-                `${r.width}x${r.height}`,
-                `→ ${r.spriteFrameUuid}`,
-              );
-            }
-          } catch (err) {
-            console.warn('[image-import] failed', rel, err.message);
-          }
-          return;
-        }
-        if (AUDIO_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (!fs.existsSync(abs)) return;
-          try {
-            const r = importAudio(abs, LIBRARY);
-            if (r && r.changed.length) {
-              console.log('[audio-import]', rel, `→ ${r.uuid}${r.ext}`);
-            }
-          } catch (err) {
-            console.warn('[audio-import] failed', rel, err.message);
-          }
-          return;
-        }
-        if (FONT_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (!fs.existsSync(abs)) return;
-          try {
-            const r = importFont(abs, LIBRARY);
-            if (r && r.changed.length) {
-              console.log('[font-import]', rel, `→ ${r.uuid}/${r.nativeName}`);
-            }
-          } catch (err) {
-            console.warn('[font-import] failed', rel, err.message);
-          }
-          return;
-        }
-        if (BMFONT_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (!fs.existsSync(abs)) return;
-          try {
-            const r = importBMFont(abs, LIBRARY);
-            if (r && r.changed.length) {
-              console.log('[bmfont-import]', rel, `chars=${r.chars}`, `→ ${r.uuid}`);
-            }
-          } catch (err) {
-            console.warn('[bmfont-import] failed', rel, err.message);
-          }
-          return;
-        }
-        if (ext === '.atlas') {
-          // Spine atlas edit → re-import the sibling .json or .skel skeleton.
-          const base = path.join(ASSETS, rel).slice(0, -'.atlas'.length);
-          const sibling = fs.existsSync(`${base}.json`) ? `${base}.json` : `${base}.skel`;
-          if (fs.existsSync(sibling)) importSpineLogged(sibling, rel);
-          return;
-        }
-        if (ext === '.skel') {
-          const abs = path.join(ASSETS, rel);
-          if (fs.existsSync(abs)) importSpineLogged(abs, rel);
-          return;
-        }
-        if (PLIST_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (fs.existsSync(abs)) importPlistLogged(abs, rel);
-          return;
-        }
-        if (GLTF_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (fs.existsSync(abs)) importGltfLogged(abs, rel);
-          return;
-        }
-        if (FBX_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (fs.existsSync(abs)) importFbxLogged(abs, rel);
-          return;
-        }
-        if (TEXT_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (!fs.existsSync(abs)) return;
-          try {
-            const r = importText(abs, LIBRARY);
-            if (r && r.changed.length) console.log('[text-import]', rel, `→ ${r.uuid}`);
-          } catch (err) {
-            console.warn('[text-import] failed', rel, err.message);
-          }
-          return;
-        }
-        if (SYNC_EXTS.has(ext)) {
-          const abs = path.join(ASSETS, rel);
-          if (ext === '.json' && fs.existsSync(abs)) {
-            const cls = classifyJson(abs);
-            if (cls.kind === 'spine') {
-              importSpineLogged(abs, rel, cls.parsed);
-              return;
-            }
-            if (cls.kind === 'skip') return;
-            if (cls.kind === 'json') {
-              const r = importJsonAsset(abs, cls.parsed);
-              if (r && r.changed) console.log('[json-import]', rel, '→', path.relative(PROJECT, r.libPath));
-              return;
-            }
-          }
-          const r = syncAssetToLibrary(abs);
-          if (r && r.changed) console.log('[asset-sync]', rel, '→', path.relative(PROJECT, r.libPath));
-        }
+        const rel = String(name).replace(/\.meta$/, '');
+        if (/\.d\.ts$/.test(rel)) return;
+        const abs = path.join(ASSETS, rel);
+        ingestSourceAsset(abs, { reimportAtlasSibling: true });
+        if (/\.(ts|js)$/.test(rel)) scheduleMiniBuild(rel);
+        maybeViewweaverFromAsset(rel.replace(/\\/g, '/'));
       };
       try {
         const w = fs.watch(ASSETS, { recursive: true }, (_e, fn) => {
