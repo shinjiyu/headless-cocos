@@ -22,6 +22,12 @@ git checkout feat/artist-preview-design
 npm install
 ```
 
+`npm install` **只在 `$STACK` 根目录跑上面这一次。**
+
+禁止进 `runtime/` 或 `runtime/3.8.8/` 跑 `npm install` / `npm ci` / `npm prune`。  
+`@cocos/creator-programming-*` 是预置的，不在 dependencies 里；一装包就会被删掉，packer 全坏。  
+缺 `@babel/helpers` 或 `@cocos/*` = 这份 runtime 坏了：停预览，用干净的 `runtime/3.8.8` 整目录覆盖（重新 clone，或 `node spike/fetch-runtime.mjs`）。不要从 Creator 抠包。不要改 `runtime/package.json` 的 `engines` 去让 npm 能装。
+
 ## 2. 建工程
 
 用户说了 3D / 模型 / 灯 / 透视，只用 3D。不要先建 2D 再改。

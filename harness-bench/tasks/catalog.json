@@ -1,0 +1,110 @@
+{
+  "version": 3,
+  "projectTemplate": "harness-bench/templates/base-pa",
+  "notes": "Real AIWS smoke/demo/pa copied to templates/base-pa, then HARNESS_SEED bugs applied. Re-seed: node scripts/seed-base-pa.mjs",
+  "aiwsSource": "D:/workspace/ae_meta_mcp/ai-game-workspace/data/aiws-data/workspaces/smoke/demo/pa",
+  "tasks": [
+    {
+      "id": "T01-cta-mask-width",
+      "tier": "easy",
+      "tags": [
+        "prefab",
+        "cta",
+        "layout"
+      ],
+      "source": "AIWS: CTA的mask 好像宽度有问题"
+    },
+    {
+      "id": "T02-cta-sfx-legend-win",
+      "tier": "easy",
+      "tags": [
+        "script",
+        "sfx",
+        "cta"
+      ],
+      "source": "AIWS: CTA音效改成 legend win（仅 CTA）"
+    },
+    {
+      "id": "T03-symbol-vanish-sfx",
+      "tier": "easy",
+      "tags": [
+        "script",
+        "sfx",
+        "board"
+      ],
+      "source": "AIWS: 每一个球消除触发音效"
+    },
+    {
+      "id": "T04-remove-debug-click-gate",
+      "tier": "medium",
+      "tags": [
+        "script",
+        "logic",
+        "mainui"
+      ],
+      "source": "AIWS: 倍率收集/第二段前等点击是调试逻辑，去掉"
+    },
+    {
+      "id": "T05-score-font-system-off",
+      "tier": "medium",
+      "tags": [
+        "script",
+        "font",
+        "mainui"
+      ],
+      "source": "AIWS: 分数不要用系统字"
+    },
+    {
+      "id": "T06-score-on-symbol-win",
+      "tier": "medium",
+      "tags": [
+        "script",
+        "board",
+        "timing",
+        "mainui"
+      ],
+      "source": "AIWS: 出分时机应对齐高亮/消除开始（symbol-win）"
+    },
+    {
+      "id": "T07-thunder-sfx-earlier",
+      "tier": "medium",
+      "tags": [
+        "script",
+        "sfx",
+        "timing"
+      ],
+      "source": "AIWS: 闪电音效有点晚了"
+    },
+    {
+      "id": "T08-cta-btn-align-start",
+      "tier": "medium",
+      "tags": [
+        "prefab",
+        "layout",
+        "cta"
+      ],
+      "source": "AIWS: CTA BTN 位置和开始 BTN 相同"
+    },
+    {
+      "id": "T09-mainui-mask-width",
+      "tier": "hard",
+      "tags": [
+        "prefab",
+        "layout",
+        "mask",
+        "mainui"
+      ],
+      "source": "AIWS: mask 宽度太小 / 顶到底板"
+    },
+    {
+      "id": "T10-turn-off-debug-hud",
+      "tier": "hard",
+      "tags": [
+        "script",
+        "mainui",
+        "cleanup"
+      ],
+      "source": "AIWS: 把测试加的去掉"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "T05-stop-random-move",
+  "workdir": "copy-template",
+  "files": ["assets/scripts/HeadlessProbe.ts"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "_createGreenSquare\\(",
+      "message": "square creation should remain"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "MOVE_SPEED\\s*\\*\\s*dt",
+      "message": "position updates using MOVE_SPEED*dt should be removed/disabled"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "this\\._pickRandomTarget\\(\\)",
+      "message": "no this._pickRandomTarget() calls"
+    }
+  ]
+}

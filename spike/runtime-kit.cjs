@@ -103,13 +103,57 @@ function kitStatus(opts = {}) {
   };
 }
 
+function kitDoNotNpmHelp() {
+  return [
+    '[runtime-kit] 不要在 runtime/ 里跑 npm install / npm ci / npm prune。',
+    '@cocos/creator-programming-* 是预置的，不在 dependencies 里；一装包就会被删掉，packer 全坏。',
+    '缺 @babel/helpers 或 @cocos/* = 这份 runtime 坏了。停预览，用干净的 runtime/3.8.8 整目录覆盖（重新 clone 或 node spike/fetch-runtime.mjs）。',
+    '不要从 Creator 安装目录抠包。不要为补模块去 npm install。',
+  ].join('\n');
+}
+
 function kitMissingHelp(repoRoot) {
   const root = repoRoot || repoRootFrom(__dirname);
   return [
     `[runtime-kit] missing ${path.join(root, 'runtime', ENGINE_VERSION)}/.`,
     'This directory ships in the repo. Re-clone feat/artist-preview-design.',
     'Do not install Cocos Creator. Do not extract app.asar.',
+    kitDoNotNpmHelp(),
   ].join('\n');
+}
+
+function plantNpmGuard(kitRoot) {
+  if (!kitRoot) return;
+  fs.mkdirSync(kitRoot, { recursive: true });
+  fs.writeFileSync(
+    path.join(kitRoot, 'block-npm-install.cjs'),
+    [
+      "'use strict';",
+      "console.error('[runtime-kit] STOP: do not npm install in runtime/.');",
+      "console.error('Restore the whole runtime/3.8.8 kit. Do not install @babel/* or @cocos/*.');",
+      'process.exit(1);',
+      '',
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(kitRoot, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: `headless-cocos-runtime-${ENGINE_VERSION}`,
+        private: true,
+        description:
+          'Pinned Cocos packer tree. Do not npm install here. Do not relax engines to make npm work.',
+        engines: { node: '<0.0.0' },
+        scripts: { preinstall: 'node block-npm-install.cjs' },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  fs.writeFileSync(
+    path.join(kitRoot, '.npmrc'),
+    ['engine-strict=true', 'ignore-scripts=false', ''].join('\n'),
+  );
 }
 
 module.exports = {
@@ -117,6 +161,8 @@ module.exports = {
   kitDir,
   kitStatus,
   kitMissingHelp,
+  kitDoNotNpmHelp,
+  plantNpmGuard,
   engineLooksReady,
   npmLooksReady,
   resolveEngineSnapshot,

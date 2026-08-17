@@ -1,0 +1,13 @@
+
+eff_spine_advertising_domino21_hand.png
+size: 148,124
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+hand
+  rotate: false
+  xy: 2, 2
+  size: 144, 120
+  orig: 144, 120
+  offset: 0, 0
+  index: -1

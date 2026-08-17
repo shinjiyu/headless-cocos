@@ -12,3 +12,4 @@ export const resolveNpmRoot = kit.resolveNpmRoot;
 export const resolveUuidUtil = kit.resolveUuidUtil;
 export const kitStatus = kit.kitStatus;
 export const kitMissingHelp = kit.kitMissingHelp;
+export const kitDoNotNpmHelp = kit.kitDoNotNpmHelp;

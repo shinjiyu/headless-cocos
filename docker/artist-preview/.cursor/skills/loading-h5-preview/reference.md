@@ -23,8 +23,8 @@
 ## CSS / 布局要点（BgPlus 十字切适配，不切图）
 
 - `.poke-splash`：`position:fixed; inset:0; overflow:hidden; background:#000`（禁止 `background-size:cover`）
-- 安全区 1120×630 / 630×1120，`FIXED_WIDTH`/`FIXED_HEIGHT` 算统一 scale
-- BG：源像素×scale，**图中心 = 屏中心**；原画用 PSD left/top 相对 BG 锁定
+- 安全区 1120×630 / 630×1120，相对 **PSD 画布中心**，`designScale` 铺满视口
+- BG / 前景：按 PSD left/top 相对该安全区对齐（前景仍为非背景层合成图）
 - 进度条靠底：`bottom: calc(env(safe-area-inset-bottom) + 6vh)`（竖）/ `4vh`（横）
 
 ## 假进度

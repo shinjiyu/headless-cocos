@@ -1,0 +1,21 @@
+{
+  "id": "T04-remove-debug-click-gate",
+  "files": [
+    "assets/scripts/_genbot/MainUI/MainUI.view.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "WAIT_CLICK_BEFORE_SECOND\\s*=\\s*false",
+      "message": "WAIT_CLICK_BEFORE_SECOND must be false"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "WAIT_CLICK_BEFORE_SECOND\\s*=\\s*true",
+      "message": "debug gate must not stay true"
+    }
+  ]
+}

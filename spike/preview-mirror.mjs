@@ -34,7 +34,7 @@ import {
   matchRegistryAsset,
   status as viewweaverStatus,
 } from './viewweaver-host.mjs';
-import { resolveEngineSnapshot, kitMissingHelp } from './engine-snapshot-path.mjs';
+import { resolveEngineSnapshot, kitMissingHelp, kitDoNotNpmHelp } from './engine-snapshot-path.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7460);
@@ -1055,8 +1055,12 @@ function runMiniBuild(reason) {
         console.log(`[mini] build#${seq} ok in ${ms}ms`);
         broadcastReload('mini:' + reason);
       } else {
-        const tail = Buffer.concat(outBuf).toString().slice(-800);
+        const text = Buffer.concat(outBuf).toString();
+        const tail = text.slice(-800);
         console.error(`[mini] build#${seq} FAILED (code=${code}) in ${ms}ms\n${tail}`);
+        if (/Cannot find module|MODULE_NOT_FOUND/i.test(text)) {
+          console.error(kitDoNotNpmHelp());
+        }
       }
       buildRunning = false;
       if (buildPending) {

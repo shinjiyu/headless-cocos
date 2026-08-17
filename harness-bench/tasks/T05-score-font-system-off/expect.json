@@ -1,0 +1,21 @@
+{
+  "id": "T05-score-font-system-off",
+  "files": [
+    "assets/scripts/_genbot/MainUI/MainUI.view.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "SCORE_USE_SYSTEM_FONT\\s*=\\s*false",
+      "message": "SCORE_USE_SYSTEM_FONT must be false"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "SCORE_USE_SYSTEM_FONT\\s*=\\s*true",
+      "message": "system font flag must not stay true"
+    }
+  ]
+}

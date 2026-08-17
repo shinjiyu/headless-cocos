@@ -134,6 +134,40 @@ export function createJobStore(jobsRoot) {
     return metas.slice(0, limit);
   }
 
+  /** UUID 形 job id，防路径穿越 */
+  function isSafeJobId(id) {
+    return (
+      typeof id === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        id,
+      )
+    );
+  }
+
+  /**
+   * 删除整份稿件目录（源 PSD / exports / loading-h5 等）。
+   * @returns {{ ok: true, id: string } | { ok: false, error: string }}
+   */
+  function deleteJob(id) {
+    if (!isSafeJobId(id)) {
+      return { ok: false, error: 'invalid job id' };
+    }
+    const dir = jobDir(id);
+    const rootResolved = path.resolve(jobsRoot);
+    const dirResolved = path.resolve(dir);
+    if (
+      dirResolved === rootResolved ||
+      !dirResolved.startsWith(rootResolved + path.sep)
+    ) {
+      return { ok: false, error: 'invalid job path' };
+    }
+    if (!fs.existsSync(dirResolved)) {
+      return { ok: false, error: 'job not found' };
+    }
+    fs.rmSync(dirResolved, { recursive: true, force: true });
+    return { ok: true, id };
+  }
+
   return {
     jobsRoot,
     createJob,
@@ -146,6 +180,8 @@ export function createJobStore(jobsRoot) {
     readSceneEdit,
     writeSceneEdit,
     listJobs,
+    deleteJob,
+    isSafeJobId,
     jobDir,
   };
 }

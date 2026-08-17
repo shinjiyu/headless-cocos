@@ -201,7 +201,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       });
       res.end();
@@ -274,6 +274,22 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, enrich(meta));
+      return;
+    }
+
+    if (req.method === 'DELETE' && jobMatch) {
+      const id = jobMatch[1];
+      const existed = store.readMeta(id);
+      if (!existed) {
+        sendJson(res, 404, { error: 'job not found' });
+        return;
+      }
+      const result = store.deleteJob(id);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error || 'delete failed' });
+        return;
+      }
+      sendJson(res, 200, { ok: true, deleted: id });
       return;
     }
 

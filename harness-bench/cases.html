@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Harness Bench · base-pa Cases</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1f1c; --muted: #5a655e; --line: #d4ddd6; --paper: #f3f6f2;
+      --panel: #ffffff; --easy: #2f6b4f; --medium: #8a5a12; --hard: #8b2e2e;
+      --accent: #1f5c4a; --code-bg: #e8eee9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "IBM Plex Sans", sans-serif; color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, #dce8e0 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 0%, #e4ebe3 0%, transparent 50%),
+        var(--paper);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 80px; }
+    header h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px; }
+    header p { margin: 0; color: var(--muted); max-width: 64ch; line-height: 1.5; }
+    .banner {
+      margin: 20px 0 24px; border: 1px solid var(--line); background: var(--panel);
+      padding: 14px 16px; font-size: 0.875rem; line-height: 1.5; color: var(--muted);
+    }
+    .banner strong { color: var(--ink); }
+    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+    .stat { border: 1px solid var(--line); background: var(--panel); padding: 10px 14px; min-width: 110px; }
+    .stat b { display: block; font-family: "IBM Plex Mono", monospace; font-size: 1.25rem; }
+    .stat span { font-size: 0.75rem; color: var(--muted); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .toolbar button {
+      font: inherit; font-size: 0.8125rem; font-weight: 500;
+      border: 1px solid var(--line); background: var(--panel); padding: 7px 12px; cursor: pointer;
+    }
+    .toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: #e7f1ec; }
+    .layout { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+    .list { border: 1px solid var(--line); background: var(--panel); }
+    .item {
+      width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line);
+      background: transparent; padding: 14px 16px; cursor: pointer; font: inherit; display: block;
+    }
+    .item:last-child { border-bottom: 0; }
+    .item:hover { background: #f7faf7; }
+    .item[aria-current="true"] { background: #e7f1ec; box-shadow: inset 3px 0 0 var(--accent); }
+    .item-id { font-family: "IBM Plex Mono", monospace; font-size: 0.8125rem; font-weight: 500; margin-bottom: 6px; }
+    .item-src { font-size: 0.75rem; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+    .item-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill {
+      font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; padding: 2px 7px; border: 1px solid currentColor;
+    }
+    .pill.easy { color: var(--easy); } .pill.medium { color: var(--medium); } .pill.hard { color: var(--hard); }
+    .pill.tag { color: var(--muted); border-color: var(--line); font-weight: 500; text-transform: none; letter-spacing: 0; }
+    .detail { border: 1px solid var(--line); background: var(--panel); min-height: 420px; }
+    .detail-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+    .detail-head h2 { margin: 0 0 10px; font-size: 1.1rem; font-family: "IBM Plex Mono", monospace; font-weight: 500; }
+    .detail-body { padding: 18px 20px 24px; }
+    .detail-body h3 { margin: 0 0 10px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    .detail-body section + section { margin-top: 22px; }
+    .prompt { white-space: pre-wrap; line-height: 1.55; font-size: 0.9375rem; margin: 0; }
+    .files { font-family: "IBM Plex Mono", monospace; font-size: 0.8125rem; margin: 0; padding-left: 1.1rem; color: var(--muted); }
+    .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .checks li { border: 1px solid var(--line); padding: 10px 12px; font-size: 0.875rem; }
+    .checks .type { font-family: "IBM Plex Mono", monospace; font-size: 0.6875rem; color: var(--accent); display: block; margin-bottom: 4px; }
+    code { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; background: var(--code-bg); padding: 1px 5px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Harness Bench · base-pa</h1>
+      <p>基础工程是 AIWS <code>smoke/demo/pa</code> 全量拷贝（~17MB 真 PA），再种 HARNESS_SEED。不是空桩。</p>
+    </header>
+    <div class="banner">
+      <strong>模板：</strong><code>templates/base-pa</code> ·
+      含 MainUI/CTA genbot、BoardAudioBinder、editor-app、extensions。
+      SEED 见 <code>HARNESS_SEED.md</code>。
+    </div>
+    <div class="stats">
+      <div class="stat"><b>10</b><span>tasks</span></div>
+      <div class="stat"><b>~473</b><span>project files</span></div>
+      <div class="stat"><b>3</b><span>easy</span></div>
+      <div class="stat"><b>5</b><span>medium</span></div>
+      <div class="stat"><b>2</b><span>hard</span></div>
+    </div>
+    <div class="toolbar" id="filters"></div>
+    <div class="layout">
+      <div class="list" id="list"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </div>
+  <script>
+    const TASKS = [
+      { id:"T01-cta-mask-width", tier:"easy", tags:["prefab","cta"], source:"CTA mask 过窄", prompt:"CTA.prefab Mask width 220 → ≥700", files:["assets/resources/prefab/CTA.prefab"], checks:[{type:"regex",message:"width>=700"},{type:"not_regex",message:"Mask not 220"}] },
+      { id:"T02-cta-sfx-legend-win", tier:"easy", tags:["script","sfx"], source:"CTA → legend_win", prompt:"CTA.view Sfx.play bigwin → legend_win", files:["assets/scripts/_genbot/CTA/CTA.view.ts"], checks:[{type:"regex",message:"legend_win"},{type:"not_regex",message:"no bigwin"}] },
+      { id:"T03-symbol-vanish-sfx", tier:"easy", tags:["script","sfx"], source:"每球消除音", prompt:"BoardAudioBinder 补 symbol-vanish 映射", files:["assets/scripts/audio/BoardAudioBinder.ts"], checks:[{type:"regex",message:"symbol-vanish mapped"}] },
+      { id:"T04-remove-debug-click-gate", tier:"medium", tags:["script","mainui"], source:"去掉第二段调试点击", prompt:"WAIT_CLICK_BEFORE_SECOND = false", files:["assets/scripts/_genbot/MainUI/MainUI.view.ts"], checks:[{type:"regex",message:"gate false"}] },
+      { id:"T05-score-font-system-off", tier:"medium", tags:["script","font"], source:"不要系统字", prompt:"SCORE_USE_SYSTEM_FONT = false", files:["assets/scripts/_genbot/MainUI/MainUI.view.ts"], checks:[{type:"regex",message:"system font off"}] },
+      { id:"T06-score-on-symbol-win", tier:"medium", tags:["script","timing"], source:"出分对齐 symbol-win", prompt:"wireBoardEvents: symbol-vanish → symbol-win", files:["assets/scripts/_genbot/MainUI/MainUI.view.ts"], checks:[{type:"regex",message:"symbol-win"},{type:"not_regex",message:"not vanish"}] },
+      { id:"T07-thunder-sfx-earlier", tier:"medium", tags:["script","sfx"], source:"闪电音偏晚", prompt:"THUNDER_SFX_DELAY ≤ 0.4", files:["assets/scripts/_genbot/MainUI/MainUI.view.ts"], checks:[{type:"regex",message:"delay<=0.4"}] },
+      { id:"T08-cta-btn-align-start", tier:"medium", tags:["prefab","layout"], source:"CTA btn 对齐开始键", prompt:"CTA btn.y -50 → ~-525（对齐 MainUI Btn）", files:["assets/resources/prefab/CTA.prefab"], checks:[{type:"regex",message:"y~-525"}] },
+      { id:"T09-mainui-mask-width", tier:"hard", tags:["prefab","mask"], source:"MainUI mask 太窄", prompt:"MainUI Mask width 280 → ≥720", files:["assets/resources/prefab/MainUI.prefab"], checks:[{type:"regex",message:"width>=720"}] },
+      { id:"T10-turn-off-debug-hud", tier:"hard", tags:["script","cleanup"], source:"去掉测试 HUD", prompt:"FORCE_DEBUG_HUD = false", files:["assets/scripts/_genbot/MainUI/MainUI.view.ts"], checks:[{type:"regex",message:"HUD false"}] }
+    ];
+    let filter="all", selected=TASKS[0].id;
+    const filtersEl=document.getElementById("filters"), listEl=document.getElementById("list"), detailEl=document.getElementById("detail");
+    const tiers=["all","easy","medium","hard"];
+    for (const t of tiers) {
+      const b=document.createElement("button"); b.type="button";
+      b.textContent=t==="all"?`全部 ${TASKS.length}`:`${t} ${TASKS.filter(x=>x.tier===t).length}`;
+      b.onclick=()=>{filter=t;render();}; filtersEl.appendChild(b);
+    }
+    const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    function render(){
+      const rows=filter==="all"?TASKS:TASKS.filter(t=>t.tier===filter);
+      [...filtersEl.children].forEach((b,i)=>b.setAttribute("aria-pressed",tiers[i]===filter?"true":"false"));
+      if(!rows.some(t=>t.id===selected)) selected=rows[0]?.id;
+      listEl.innerHTML="";
+      for(const t of rows){
+        const btn=document.createElement("button"); btn.type="button"; btn.className="item";
+        btn.setAttribute("aria-current",t.id===selected?"true":"false");
+        btn.innerHTML=`<div class="item-id">${t.id}</div><div class="item-row"><span class="pill ${t.tier}">${t.tier}</span>${t.tags.map(x=>`<span class="pill tag">${x}</span>`).join("")}</div><div class="item-src">${esc(t.source)}</div>`;
+        btn.onclick=()=>{selected=t.id;render();}; listEl.appendChild(btn);
+      }
+      const task=TASKS.find(t=>t.id===selected);
+      detailEl.innerHTML=`<div class="detail-head"><h2>${task.id}</h2><div class="item-row"><span class="pill ${task.tier}">${task.tier}</span>${task.tags.map(t=>`<span class="pill tag">${t}</span>`).join("")}</div><div class="item-src" style="margin-top:10px">${esc(task.source)}</div></div><div class="detail-body"><section><h3>Prompt</h3><p class="prompt">${esc(task.prompt)}</p></section><section><h3>Files</h3><ul class="files">${task.files.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></section><section><h3>Checks</h3><ul class="checks">${task.checks.map(c=>`<li><span class="type">${esc(c.type)}</span>${esc(c.message)}</li>`).join("")}</ul></section></div>`;
+    }
+    render();
+  </script>
+</body>
+</html>

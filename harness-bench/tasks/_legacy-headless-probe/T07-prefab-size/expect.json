@@ -1,0 +1,26 @@
+{
+  "id": "T07-prefab-size",
+  "workdir": "copy-template",
+  "files": ["assets/prefabs/HeroCard.prefab"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/prefabs/HeroCard.prefab",
+      "pattern": "\"width\"\\s*:\\s*360",
+      "message": "UITransform width must be 360"
+    },
+    {
+      "type": "regex",
+      "file": "assets/prefabs/HeroCard.prefab",
+      "pattern": "\"height\"\\s*:\\s*96",
+      "message": "UITransform height must be 96"
+    },
+    {
+      "type": "includes",
+      "file": "assets/prefabs/HeroCard.prefab",
+      "value": "HEADLESS PREFAB OK",
+      "message": "label text should remain unchanged"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "headless-cocos-runtime-3.8.8",
+  "private": true,
+  "description": "Pinned Cocos packer tree. Do not npm install here. Do not relax engines to make npm work.",
+  "engines": {
+    "node": "<0.0.0"
+  },
+  "scripts": {
+    "preinstall": "node block-npm-install.cjs"
+  }
+}

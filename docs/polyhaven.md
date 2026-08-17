@@ -68,8 +68,10 @@ JSON response includes `uuid`, mesh/material sub-ids, optional `spawn` / `varian
 
 ## assetsSrcAPI
 
-For full pool / ADL / CocosTargetAdapter workflows use the sibling repo:
+For catalog / pool / disk-drop into `$GAME/assets/AssetPool/` use the sibling repo:
 
-`D:\workspace\assetsSrcAPI` — example `examples/polyhaven-cocos.adl.yaml`.
+`D:\workspace\assetsSrcAPI` — `HeadlessCocosAdapter` + `tools/import-to-headless.mjs` + `examples/polyhaven-headless.adl.yaml`.
 
-Headless-cocos only needs the download + `importGltf` path for importer CI.
+Do not route new games through `CocosTargetAdapter` (Creator `refresh-asset`).
+
+Headless-cocos still has `/__polyhaven` for importer CI (download + `importGltf` in-process).

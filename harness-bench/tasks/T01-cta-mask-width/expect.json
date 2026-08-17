@@ -1,0 +1,14 @@
+{
+  "id": "T01-cta-mask-width",
+  "files": ["assets/resources/prefab/CTA.prefab"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "node_uitransform_width",
+      "file": "assets/resources/prefab/CTA.prefab",
+      "node": "Mask",
+      "minWidth": 700,
+      "message": "CTA Mask UITransform width must be >= 700"
+    }
+  ]
+}

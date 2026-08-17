@@ -1,0 +1,26 @@
+{
+  "id": "T10-play-beep-on-start",
+  "workdir": "copy-template",
+  "files": ["assets/scripts/HeadlessProbe.ts"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "AudioSource|AudioClip|audioEngine",
+      "message": "must use Creator audio API"
+    },
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "beep|audio/beep",
+      "message": "must reference beep asset"
+    },
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "\\.play\\s*\\(",
+      "message": "must call play()"
+    }
+  ]
+}

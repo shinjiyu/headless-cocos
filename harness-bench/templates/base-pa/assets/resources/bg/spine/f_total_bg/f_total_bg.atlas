@@ -1,0 +1,47 @@
+f_total_bg.png
+size: 1553,957
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+total_light01
+  rotate: false
+  xy: 2, 2
+  size: 924, 122
+  orig: 1283, 206
+  offset: 16, 38
+  index: -1
+total_light04-1
+  rotate: true
+  xy: 1078, 171
+  size: 784, 473
+  orig: 786, 473
+  offset: 1, 0
+  index: -1
+total_light04-2
+  rotate: true
+  xy: 1078, 171
+  size: 784, 473
+  orig: 786, 473
+  offset: 1, 0
+  index: -1
+total_light04-3
+  rotate: true
+  xy: 1078, 171
+  size: 784, 473
+  orig: 786, 473
+  offset: 1, 0
+  index: -1
+total_light05
+  rotate: false
+  xy: 2, 414
+  size: 1074, 541
+  orig: 1140, 541
+  offset: 33, 0
+  index: -1
+total_pattern
+  rotate: false
+  xy: 2, 126
+  size: 1014, 286
+  orig: 1023, 290
+  offset: 9, 2
+  index: -1

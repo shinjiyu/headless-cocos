@@ -1,0 +1,20 @@
+{
+  "id": "T03-square-color-green",
+  "workdir": "copy-template",
+  "files": ["assets/scripts/HeadlessProbe.ts"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "new Color\\(\\s*40\\s*,\\s*200\\s*,\\s*80\\s*,\\s*255\\s*\\)",
+      "message": "fillColor must be Color(40, 200, 80, 255)"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "new Color\\(\\s*220\\s*,\\s*40\\s*,\\s*40",
+      "message": "old red color must be removed"
+    }
+  ]
+}

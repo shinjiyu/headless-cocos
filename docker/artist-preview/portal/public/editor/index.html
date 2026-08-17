@@ -296,12 +296,11 @@
       min-height: 0;
       overflow: hidden;
     }
+    /* 不用 justify-content:center：宽画布时左侧滚不到（flex 居中经典坑） */
     .stage-wrap {
       position: absolute;
       inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      display: block;
       overflow: auto;
       transform-style: preserve-3d;
       background: #0c0c0e;
@@ -360,6 +359,8 @@
       background-clip: padding-box;
     }
     .stage-wrap.pick-3d {
+      display: flex;
+      justify-content: center;
       align-items: center;
       perspective: min(100vw, 2400px);
       perspective-origin: 50% 38%;

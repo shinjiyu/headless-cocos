@@ -1,0 +1,20 @@
+{
+  "id": "T01-bump-probe",
+  "workdir": "copy-template",
+  "files": ["assets/scripts/HeadlessProbe.ts"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "PROBE_VERSION\\s*=\\s*12\\b",
+      "message": "PROBE_VERSION should become 12 (template starts at 11)"
+    },
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "DEMO_LABEL\\s*=\\s*'blue-square-random-move'",
+      "message": "DEMO_LABEL must stay unchanged"
+    }
+  ]
+}

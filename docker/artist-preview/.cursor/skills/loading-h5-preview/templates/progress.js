@@ -67,7 +67,7 @@
     return fallback || '';
   }
 
-  /** AspectRatioAdapter9to16：1120×630 安全区 FIXED_WIDTH / FIXED_HEIGHT */
+  /** AspectRatioAdapter9to16：1120×630 安全区铺满视口 */
   function designScale(sw, sh, longSide, shortSide) {
     var designRatio = longSide / shortSide;
     if (sw >= sh) {
@@ -97,13 +97,33 @@
     });
   }
 
+  /**
+   * 布局：以 PSD 画布中心的设计安全区（横 1120×630 / 竖 630×1120）铺满屏幕。
+   * BG / 前景按 PSD 坐标相对该安全区对齐，避免：
+   * - contain 前景框 → 宽屏两侧留白
+   * - 按前景 bbox 居中 → 被右侧 LOGO 拉偏
+   */
   function applyAssets() {
     var m = window.__LOADING_MANIFEST__ || {};
     var design = m.design || { long: 1120, short: 630 };
+    var longSide = design.long || 1120;
+    var shortSide = design.short || 630;
     var sw = window.innerWidth || document.documentElement.clientWidth || 1;
     var sh = window.innerHeight || document.documentElement.clientHeight || 1;
     var land = sw >= sh;
-    var scale = designScale(sw, sh, design.long || 1120, design.short || 630);
+    var scale = designScale(sw, sh, longSide, shortSide);
+
+    var designW = land ? longSide : shortSide;
+    var designH = land ? shortSide : longSide;
+    var canvasW = (m.canvas && m.canvas.width) || designW;
+    var canvasH = (m.canvas && m.canvas.height) || designH;
+    var frameL = (canvasW - designW) / 2;
+    var frameT = (canvasH - designH) / 2;
+
+    var stageW = designW * scale;
+    var stageH = designH * scale;
+    var stageLeft = (sw - stageW) / 2;
+    var stageTop = (sh - stageH) / 2;
 
     var bgPack = land
       ? (m.bg && m.bg.landscape) || null
@@ -131,12 +151,10 @@
       var bgLeft = bgPack && bgPack.left != null ? bgPack.left : 0;
       var bgTop = bgPack && bgPack.top != null ? bgPack.top : 0;
 
-      var dw = bgW * scale;
-      var dh = bgH * scale;
-      bgEl.style.width = dw + 'px';
-      bgEl.style.height = dh + 'px';
-      bgEl.style.left = sw / 2 - dw / 2 + 'px';
-      bgEl.style.top = sh / 2 - dh / 2 + 'px';
+      bgEl.style.width = bgW * scale + 'px';
+      bgEl.style.height = bgH * scale + 'px';
+      bgEl.style.left = stageLeft + (bgLeft - frameL) * scale + 'px';
+      bgEl.style.top = stageTop + (bgTop - frameT) * scale + 'px';
 
       if (!artEl || !artUrl || !artPack) {
         if (artEl) artEl.style.display = 'none';
@@ -145,12 +163,12 @@
       artEl.style.display = 'block';
       var aw = artPack.srcWidth || artPack.width || artEl.naturalWidth || 1;
       var ah = artPack.srcHeight || artPack.height || artEl.naturalHeight || 1;
-      var ox = (artPack.left != null ? artPack.left : 0) - bgLeft;
-      var oy = (artPack.top != null ? artPack.top : 0) - bgTop;
+      var artLeft = artPack.left != null ? artPack.left : 0;
+      var artTop = artPack.top != null ? artPack.top : 0;
       artEl.style.width = aw * scale + 'px';
       artEl.style.height = ah * scale + 'px';
-      artEl.style.left = sw / 2 - dw / 2 + ox * scale + 'px';
-      artEl.style.top = sh / 2 - dh / 2 + oy * scale + 'px';
+      artEl.style.left = stageLeft + (artLeft - frameL) * scale + 'px';
+      artEl.style.top = stageTop + (artTop - frameT) * scale + 'px';
     });
   }
 

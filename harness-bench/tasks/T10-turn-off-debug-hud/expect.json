@@ -1,0 +1,21 @@
+{
+  "id": "T10-turn-off-debug-hud",
+  "files": [
+    "assets/scripts/_genbot/MainUI/MainUI.view.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "FORCE_DEBUG_HUD\\s*=\\s*false",
+      "message": "FORCE_DEBUG_HUD must be false"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "FORCE_DEBUG_HUD\\s*=\\s*true",
+      "message": "debug HUD must not stay true"
+    }
+  ]
+}

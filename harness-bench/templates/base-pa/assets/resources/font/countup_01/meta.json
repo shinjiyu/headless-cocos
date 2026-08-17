@@ -1,0 +1,176 @@
+{
+  "name": "countup_01",
+  "fontSize": 50,
+  "commonHeight": 58,
+  "atlasName": "countup_01.png",
+  "importUrl": "https://play.godeebxp.com/egames/cc497f08a3f9943e8d426d034df6261a1330fd17/game/assets/g1005/import/07/07ec6b4d7.json",
+  "textureUuid": null,
+  "glyphs": ",.0123456789x∞",
+  "fontDefDictionary": {
+    "32": {
+      "xOffset": 0,
+      "yOffset": 46,
+      "xAdvance": 14,
+      "rect": {
+        "x": 134,
+        "y": 221,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "44": {
+      "xOffset": 0,
+      "yOffset": 123,
+      "xAdvance": 67,
+      "rect": {
+        "x": 2,
+        "y": 524,
+        "width": 67,
+        "height": 96
+      }
+    },
+    "46": {
+      "xOffset": 0,
+      "yOffset": 123,
+      "xAdvance": 62,
+      "rect": {
+        "x": 134,
+        "y": 140,
+        "width": 62,
+        "height": 79
+      }
+    },
+    "48": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 330,
+        "y": 386,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "49": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 462,
+        "y": 194,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "50": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 330,
+        "y": 194,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "51": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 198,
+        "y": 386,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "52": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 198,
+        "y": 194,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "53": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 462,
+        "y": 2,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "54": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 330,
+        "y": 2,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "55": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 198,
+        "y": 2,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "56": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 2,
+        "y": 332,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "57": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 130,
+      "rect": {
+        "x": 2,
+        "y": 140,
+        "width": 130,
+        "height": 190
+      }
+    },
+    "120": {
+      "xOffset": 0,
+      "yOffset": 0,
+      "xAdvance": 102,
+      "rect": {
+        "x": 594,
+        "y": 2,
+        "width": 102,
+        "height": 180
+      }
+    },
+    "8734": {
+      "xOffset": 0,
+      "yOffset": 34,
+      "xAdvance": 194,
+      "rect": {
+        "x": 2,
+        "y": 2,
+        "width": 194,
+        "height": 136
+      }
+    }
+  }
+}

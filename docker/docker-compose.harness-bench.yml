@@ -1,0 +1,64 @@
+# Harness-bench against Docker headless Cocos preview.
+# No Cocos Creator IDE. No cocos-meta-mcp.
+#
+# From repo root:
+#   docker compose -f docker/docker-compose.harness-bench.yml up -d --build
+#   docker compose -f docker/docker-compose.harness-bench.yml run --rm harness-runner \
+#     node run.mjs --task T02-cta-sfx-legend-win --harness stub --inplace /workspace
+#
+# Preview: http://127.0.0.1:7471/
+
+services:
+  cocos-preview-harness:
+    image: cocos-headless-preview:latest
+    build:
+      context: ./build-context
+    container_name: cocos-preview-harness
+    ports:
+      - "7471:7460"
+    volumes:
+      - "../harness-bench/docker-workspace:/workspace"
+    environment:
+      PACKER: mini
+      PORT: 7460
+      PROJECT: /workspace
+      NPM_ROOT: /app/node_modules
+      UUID_UTIL: /app/vendor-utils/dist/uuid.js
+      ENGINE_SNAPSHOT: /engine
+      # Windows host bind path — keep in sync with mount for mini-packer overlay hashes
+      PROJECT_URL: "file:///D:/tempWorkspace/headless-cocos-research/harness-bench/docker-workspace"
+      WATCH_POLL: "1"
+      WATCH_POLL_MS: "800"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:7460/__hmr/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  harness-runner:
+    image: node:20-bookworm-slim
+    container_name: cocos-harness-runner
+    working_dir: /bench
+    volumes:
+      - "../harness-bench:/bench"
+      - "../harness-bench/docker-workspace:/workspace"
+    environment:
+      TEMPLATE_PROJECT: /bench/templates/base-pa
+      WORK_ROOT: /bench/work
+      # Agents must only touch /workspace when --inplace is used
+      HARNESS_HEADLESS: "1"
+      HARNESS_FORBID_IDE: "1"
+      HARNESS_FORBID_MCP: "1"
+    depends_on:
+      cocos-preview-harness:
+        condition: service_healthy
+    entrypoint: ["node"]
+    command: ["run.mjs", "--list"]

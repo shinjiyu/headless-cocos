@@ -1,0 +1,21 @@
+{
+  "id": "T07-thunder-sfx-earlier",
+  "files": [
+    "assets/scripts/_genbot/MainUI/MainUI.view.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "THUNDER_SFX_DELAY\\s*=\\s*0\\.[0-4]\\d*",
+      "message": "THUNDER_SFX_DELAY must be <= 0.4"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "THUNDER_SFX_DELAY\\s*=\\s*0\\.85",
+      "message": "old 0.85 delay must be gone"
+    }
+  ]
+}

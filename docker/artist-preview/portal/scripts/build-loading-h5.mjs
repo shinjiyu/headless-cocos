@@ -1,6 +1,6 @@
 /**
  * 从 layers.json + tiles 生成 loading-h5/（纯 H5 Splash，无 Cocos）。
- * BG/原画：整图不切块；统一同一长边档位导出 WebP（+ AVIF），不区分 S/M/L。
+ * BG = 背景层；前景 = 同方向组内除背景/范围框外全部合成一张透明图。
  * CLI: node build-loading-h5.mjs --job-dir /data/jobs/{id}
  */
 import fs from 'node:fs';
@@ -38,9 +38,8 @@ function classifyPath(p) {
   if (/背景|bg\b|_bg|bg_/i.test(lower) || /背景/.test(s)) {
     return { role: 'bg', orient };
   }
-  if (/原画|原畫|logo|title/i.test(s)) return { role: 'art', orient };
-  if (/进度|進度|progress/i.test(s)) return { role: 'progress', orient };
-  return { role: 'other', orient };
+  // 模板约定：除背景外全部是前景（LOGO / 主体 / TAP / 文案…）
+  return { role: 'fg', orient };
 }
 
 function isEffectivelyVisible(tile, sceneEdit) {
@@ -82,8 +81,8 @@ function resolveTileFile(exportsDir, tile) {
  * 整图缩放到统一长边，导出 WebP（+ 可选 AVIF）。
  * @returns {Promise<{ webp: string, avif?: string, width: number, height: number }>}
  */
-async function encodeSingle(srcPath, assetsDir, baseName, { alpha }) {
-  const meta = await sharp(srcPath).metadata();
+async function encodeBuffer(buf, assetsDir, baseName, { alpha }) {
+  const meta = await sharp(buf).metadata();
   const srcW = meta.width || 1;
   const srcH = meta.height || 1;
   const long = Math.max(srcW, srcH);
@@ -93,7 +92,7 @@ async function encodeSingle(srcPath, assetsDir, baseName, { alpha }) {
   const height = Math.max(1, Math.round(srcH * scale));
 
   const webpName = `${baseName}.webp`;
-  await sharp(srcPath)
+  await sharp(buf)
     .resize({ width, height, fit: 'fill', withoutEnlargement: true })
     .webp({
       quality: WEBP_QUALITY,
@@ -110,7 +109,7 @@ async function encodeSingle(srcPath, assetsDir, baseName, { alpha }) {
 
   try {
     const avifName = `${baseName}.avif`;
-    await sharp(srcPath)
+    await sharp(buf)
       .resize({ width, height, fit: 'fill', withoutEnlargement: true })
       .avif({ quality: AVIF_QUALITY, effort: 4 })
       .toFile(path.join(assetsDir, avifName));
@@ -120,6 +119,96 @@ async function encodeSingle(srcPath, assetsDir, baseName, { alpha }) {
   }
 
   return out;
+}
+
+async function encodeSingle(srcPath, assetsDir, baseName, { alpha }) {
+  return encodeBuffer(await fs.promises.readFile(srcPath), assetsDir, baseName, {
+    alpha,
+  });
+}
+
+/**
+ * 同方向前景层合成一张透明图。
+ * 绘制顺序：index 大的先画（与编辑器 zIndex=max-i 一致，小 index 在最上）。
+ * @returns {Promise<null | { left: number, top: number, width: number, height: number, buffer: Buffer, paths: string[] }>}
+ */
+async function compositeForeground(exportsDir, fgTiles, preferOrient) {
+  const exact = fgTiles.filter((t) => t.orient === preferOrient);
+  const pool = exact.length ? exact : fgTiles.filter((t) => !t.orient);
+  if (!pool.length) return null;
+
+  // 先画底层（大 index），后画顶层（小 index）
+  const ordered = [...pool].sort((a, b) => {
+    const ia = a.index != null ? a.index : 0;
+    const ib = b.index != null ? b.index : 0;
+    return ib - ia;
+  });
+
+  let minL = Infinity;
+  let minT = Infinity;
+  let maxR = -Infinity;
+  let maxB = -Infinity;
+  for (const t of ordered) {
+    const l = Number(t.left) || 0;
+    const top = Number(t.top) || 0;
+    const w = Math.max(1, Number(t.width) || 1);
+    const h = Math.max(1, Number(t.height) || 1);
+    minL = Math.min(minL, l);
+    minT = Math.min(minT, top);
+    maxR = Math.max(maxR, l + w);
+    maxB = Math.max(maxB, top + h);
+  }
+
+  const width = Math.max(1, Math.ceil(maxR - minL));
+  const height = Math.max(1, Math.ceil(maxB - minT));
+
+  const composites = [];
+  for (const t of ordered) {
+    const file = resolveTileFile(exportsDir, t);
+    let input = sharp(file);
+    const op = t.opacity != null ? Number(t.opacity) : 1;
+    if (op < 0.999) {
+      // 乘以整体透明度
+      const { data, info } = await input
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const aMul = Math.max(0, Math.min(1, op));
+      for (let i = 3; i < data.length; i += 4) {
+        data[i] = Math.round(data[i] * aMul);
+      }
+      input = sharp(data, {
+        raw: { width: info.width, height: info.height, channels: 4 },
+      });
+    }
+    const buf = await input.png().toBuffer();
+    composites.push({
+      input: buf,
+      left: Math.round((Number(t.left) || 0) - minL),
+      top: Math.round((Number(t.top) || 0) - minT),
+    });
+  }
+
+  const buffer = await sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer();
+
+  return {
+    left: minL,
+    top: minT,
+    width,
+    height,
+    buffer,
+    paths: ordered.map((t) => t.path),
+  };
 }
 
 /**
@@ -145,40 +234,40 @@ export async function buildLoadingH5(jobDir, opts = {}) {
 
   const buckets = {
     bg: [],
-    art: [],
-    progress: [],
-    other: [],
+    fg: [],
+    guide: [],
   };
 
   for (const tile of layers.tiles || []) {
     if (!isEffectivelyVisible(tile, sceneEdit)) continue;
     const { role, orient } = classifyPath(tile.path);
-    if (role === 'guide') continue;
     const entry = { ...tile, orient, role };
-    if (buckets[role]) buckets[role].push(entry);
-    else buckets.other.push(entry);
+    if (role === 'guide') {
+      buckets.guide.push(entry);
+      continue;
+    }
+    if (role === 'bg') buckets.bg.push(entry);
+    else buckets.fg.push(entry);
   }
 
   const bgL = pickBest(buckets.bg, 'landscape');
   const bgP = pickBest(buckets.bg, 'portrait') || bgL;
-  const artL = pickBest(buckets.art, 'landscape');
-  const artP = pickBest(buckets.art, 'portrait') || artL;
 
   if (!bgL && !bgP) {
     throw new Error('no visible BG layer (path should contain 背景)');
   }
 
-  const packLayout = (tile, encoded) => ({
+  const packLayout = (layout, encoded) => ({
     ...encoded,
-    left: tile.left,
-    top: tile.top,
-    srcWidth: tile.width,
-    srcHeight: tile.height,
+    left: layout.left,
+    top: layout.top,
+    srcWidth: layout.width,
+    srcHeight: layout.height,
   });
 
   const bgLandscape = bgL
     ? packLayout(
-        bgL,
+        { left: bgL.left, top: bgL.top, width: bgL.width, height: bgL.height },
         await encodeSingle(resolveTileFile(exportsDir, bgL), assetsDir, 'bg-landscape', {
           alpha: false,
         }),
@@ -186,26 +275,27 @@ export async function buildLoadingH5(jobDir, opts = {}) {
     : null;
   const bgPortrait = bgP
     ? packLayout(
-        bgP,
+        { left: bgP.left, top: bgP.top, width: bgP.width, height: bgP.height },
         await encodeSingle(resolveTileFile(exportsDir, bgP), assetsDir, 'bg-portrait', {
           alpha: false,
         }),
       )
     : bgLandscape;
-  const artLandscape = artL
+
+  const fgL = await compositeForeground(exportsDir, buckets.fg, 'landscape');
+  const fgP =
+    (await compositeForeground(exportsDir, buckets.fg, 'portrait')) || fgL;
+
+  const artLandscape = fgL
     ? packLayout(
-        artL,
-        await encodeSingle(resolveTileFile(exportsDir, artL), assetsDir, 'art-landscape', {
-          alpha: true,
-        }),
+        fgL,
+        await encodeBuffer(fgL.buffer, assetsDir, 'art-landscape', { alpha: true }),
       )
     : null;
-  const artPortrait = artP
+  const artPortrait = fgP
     ? packLayout(
-        artP,
-        await encodeSingle(resolveTileFile(exportsDir, artP), assetsDir, 'art-portrait', {
-          alpha: true,
-        }),
+        fgP,
+        await encodeBuffer(fgP.buffer, assetsDir, 'art-portrait', { alpha: true }),
       )
     : artLandscape;
 
@@ -226,7 +316,6 @@ export async function buildLoadingH5(jobDir, opts = {}) {
     assetProfile: LOADING_ASSET_PROFILE,
     title,
     canvas: { width: layers.width, height: layers.height },
-    // 对齐 AspectRatioAdapter9to16 / BgPlus 安全区
     design: { long: 1120, short: 630 },
     maxEdge: MAX_EDGE,
     bg: {
@@ -243,8 +332,12 @@ export async function buildLoadingH5(jobDir, opts = {}) {
     artPortrait: pickUrl(artPortrait) || pickUrl(artLandscape) || '',
     roles: {
       bg: buckets.bg.map((t) => t.path),
-      art: buckets.art.map((t) => t.path),
-      progress: buckets.progress.map((t) => t.path),
+      fg: buckets.fg.map((t) => t.path),
+      fgComposite: {
+        landscape: fgL?.paths || [],
+        portrait: fgP?.paths || [],
+      },
+      guide: buckets.guide.map((t) => t.path),
     },
     builtAt: new Date().toISOString(),
   };

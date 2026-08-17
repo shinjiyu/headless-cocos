@@ -1,0 +1,20 @@
+{
+  "id": "T04-square-size-120",
+  "workdir": "copy-template",
+  "files": ["assets/scripts/HeadlessProbe.ts"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "SQUARE_SIZE\\s*=\\s*120\\b",
+      "message": "SQUARE_SIZE must be 120"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "SQUARE_SIZE\\s*=\\s*80\\b",
+      "message": "old SQUARE_SIZE 80 must be gone"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "T06-score-on-symbol-win",
+  "files": [
+    "assets/scripts/_genbot/MainUI/MainUI.view.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "events\\.on\\(\\s*[\"']symbol-win[\"']",
+      "message": "must listen symbol-win for scoring"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "pattern": "events\\.on\\(\\s*[\"']symbol-vanish[\"']",
+      "message": "must not score on symbol-vanish"
+    }
+  ]
+}

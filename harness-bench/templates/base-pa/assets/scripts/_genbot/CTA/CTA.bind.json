@@ -1,0 +1,47 @@
+{
+  "$schema": 1,
+  "prefab": "D:/workspace/playableAdFramework/assets/resources/prefab/CTA.prefab",
+  "prefabName": "CTA",
+  "viewClassName": "CTAView",
+  "outputPath": "D:/workspace/playableAdFramework/assets/scripts/_genbot/CTA/CTA.gen.ts",
+  "nodes": [
+    {
+      "path": "btn",
+      "field": "btn",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Button",
+          "field": "btn",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/bg_spine",
+      "field": "bgSpine",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "sp.Skeleton",
+          "field": "bgSpine",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/total",
+      "field": "totalLabel",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Label",
+          "field": "totalLabel",
+          "index": 0
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-07-08T09:43:30.149Z",
+  "toolVersion": "0.1.0"
+}

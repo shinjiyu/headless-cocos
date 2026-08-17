@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { ENGINE_VERSION, kitDir, kitStatus } = require('./runtime-kit.cjs');
+const { ENGINE_VERSION, kitDir, kitStatus, plantNpmGuard } = require('./runtime-kit.cjs');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
@@ -97,11 +97,13 @@ function main() {
     note: 'Pinned headless runtime. End users unzip this kit; they do not install Creator.',
   };
   fs.writeFileSync(path.join(dest, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  plantNpmGuard(dest);
   fs.writeFileSync(
     path.join(dest, 'README.md'),
     `# Headless runtime ${ENGINE_VERSION}\n\n` +
       `Ships in this repo. \`preview-mirror\` and mini-packer resolve this folder automatically.\n` +
-      `Do not install Cocos Creator.\n`,
+      `Do not install Cocos Creator.\n` +
+      `Do not run npm install / npm ci / npm prune in this directory.\n`,
   );
 
   const st = kitStatus({ repoRoot: REPO });

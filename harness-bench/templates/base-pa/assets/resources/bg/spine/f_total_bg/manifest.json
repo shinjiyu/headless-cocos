@@ -1,0 +1,41 @@
+{
+  "exporter": "perlab-har-spine-export",
+  "har": "play.godeebxp.com.har",
+  "builtAt": "2026-07-08T12:00:46.242Z",
+  "filter": "all",
+  "layout": "bare",
+  "scatterNote": "Golden Seth uses symbol_15 / symbol_16 as scatter Spine assets",
+  "packs": [
+    {
+      "name": "f_total_bg",
+      "category": null,
+      "dir": "temp/spine-export/f_total_bg",
+      "spineVersion": "3.8-from-4.0-from-4.1.23",
+      "animations": [
+        "in",
+        "loop"
+      ],
+      "defaultAnimation": "in",
+      "atlasPages": [
+        "f_total_bg.png"
+      ],
+      "missingPages": [],
+      "files": [
+        {
+          "path": "f_total_bg.json",
+          "bytes": 4737
+        },
+        {
+          "path": "f_total_bg.atlas",
+          "bytes": 725
+        },
+        {
+          "path": "f_total_bg.png",
+          "bytes": 314049,
+          "width": 1553,
+          "height": 957
+        }
+      ]
+    }
+  ]
+}

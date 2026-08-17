@@ -47,7 +47,7 @@ function normalize(p) {
   return /^[a-z]:/.test(r) ? r[0].toUpperCase() + r.slice(1) : r;
 }
 
-const { resolveNpmRoot, resolveUuidUtil, resolveEngineSnapshot, kitMissingHelp } = require('../runtime-kit.cjs');
+const { resolveNpmRoot, resolveUuidUtil, resolveEngineSnapshot, kitMissingHelp, kitDoNotNpmHelp } = require('../runtime-kit.cjs');
 
 const BUILTIN_PIPELINE_URL =
   'file:///C:/ProgramData/cocos/editors/Creator/3.8.8/resources/resources/3d/engine/editor/assets/default_renderpipeline/builtin-pipeline.ts';
@@ -78,7 +78,14 @@ const PROJECT_URL = ((args['project-url'] || process.env.PROJECT_URL || '') + ''
 
 // --- Resolve deps ---
 function reqCoc(rel) {
-  return require(path.join(NPM_ROOT, rel));
+  try {
+    return require(path.join(NPM_ROOT, rel));
+  } catch (e) {
+    if (e && e.code === 'MODULE_NOT_FOUND') {
+      throw new Error(`${e.message}\n${kitDoNotNpmHelp()}`);
+    }
+    throw e;
+  }
 }
 const { QuickPack } = reqCoc('@cocos/creator-programming-quick-pack/lib/quick-pack');
 const { ModLo } = reqCoc('@cocos/creator-programming-mod-lo/lib/mod-lo');

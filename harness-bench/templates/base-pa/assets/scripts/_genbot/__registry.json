@@ -1,0 +1,27 @@
+{
+  "$schema": 1,
+  "tool": "genbot",
+  "version": "0.2.0",
+  "entries": {
+    "CTA": {
+      "prefabName": "CTA",
+      "prefabPath": "assets/resources/prefab/CTA.prefab",
+      "genTsPath": "assets/scripts/_genbot/CTA/CTA.gen.ts",
+      "bindJsonPath": "assets/scripts/_genbot/CTA/CTA.bind.json",
+      "viewTsPath": "assets/scripts/_genbot/CTA/CTA.view.ts",
+      "viewClassName": "CTAView",
+      "lastGenAt": "2026-07-08T12:15:45.102Z",
+      "lastGenBy": "cli"
+    },
+    "MainUI": {
+      "prefabName": "MainUI",
+      "prefabPath": "assets/resources/prefab/MainUI.prefab",
+      "genTsPath": "assets/scripts/_genbot/MainUI/MainUI.gen.ts",
+      "bindJsonPath": "assets/scripts/_genbot/MainUI/MainUI.bind.json",
+      "viewTsPath": "assets/scripts/_genbot/MainUI/MainUI.view.ts",
+      "viewClassName": "MainUIView",
+      "lastGenAt": "2026-07-10T05:06:21.888Z",
+      "lastGenBy": "extension"
+    }
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "$schema": 1,
+  "prefab": "D:/workspace/playableAdFramework/assets/resources/prefab/MainUI.prefab",
+  "prefabName": "MainUI",
+  "viewClassName": "MainUIView",
+  "outputPath": "D:/workspace/playableAdFramework/assets/scripts/_genbot/MainUI/MainUI.gen.ts",
+  "nodes": [
+    {
+      "path": "Btn",
+      "field": "Btn",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Button",
+          "field": "Btn",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/panel",
+      "field": "panel",
+      "exposeNode": true,
+      "components": []
+    },
+    {
+      "path": "Mask/scores/total",
+      "field": "totalLabel",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Label",
+          "field": "totalLabel",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/scores/t1",
+      "field": "t1",
+      "exposeNode": true,
+      "components": []
+    },
+    {
+      "path": "Mask/scores/t2",
+      "field": "t2",
+      "exposeNode": true,
+      "components": []
+    },
+    {
+      "path": "Mask/scores/t3",
+      "field": "t3",
+      "exposeNode": true,
+      "components": []
+    },
+    {
+      "path": "Mask/scores/t4",
+      "field": "t4",
+      "exposeNode": true,
+      "components": []
+    },
+    {
+      "path": "Mask/scores/t5",
+      "field": "t5",
+      "exposeNode": true,
+      "components": []
+    },
+    {
+      "path": "Mask/multi/greenball",
+      "field": "ballGreen",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Sprite",
+          "field": "ballGreen",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/multi/blueball",
+      "field": "ballBlue",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Sprite",
+          "field": "ballBlue",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/multi/purpleball",
+      "field": "ballPurple",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Sprite",
+          "field": "ballPurple",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "Mask/multi/redball",
+      "field": "ballRed",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Sprite",
+          "field": "ballRed",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "guide_hand",
+      "field": "handGuide",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "sp.Skeleton",
+          "field": "handGuide",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "path": "btnDownLoad",
+      "field": "btnDownLoad",
+      "exposeNode": false,
+      "components": [
+        {
+          "rawType": "cc.Button",
+          "field": "btnDownLoad",
+          "index": 0
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-07-08T07:39:34.272Z",
+  "toolVersion": "0.1.0"
+}

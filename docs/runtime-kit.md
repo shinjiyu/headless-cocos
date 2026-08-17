@@ -16,6 +16,12 @@ runtime/3.8.8/
 `preview-mirror` and `spike/packer/build.cjs` resolve this folder first.
 They no longer fall back to a local Creator install.
 
+**Never `npm install` inside `runtime/`.** The `@cocos/creator-programming-*`
+packages are pre-placed and are not in `package.json` dependencies. A normal
+install prunes them and breaks mini-packer. Missing `@babel/helpers` means the
+kit is damaged — replace the whole `runtime/3.8.8/` directory. The kit writes a
+`preinstall` guard so `npm install` in that folder exits 1.
+
 ## New user
 
 1. Clone [headless-cocos](https://github.com/shinjiyu/headless-cocos)

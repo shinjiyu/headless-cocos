@@ -1,0 +1,20 @@
+{
+  "id": "T06-prefab-label-text",
+  "workdir": "copy-template",
+  "files": ["assets/prefabs/HeroCard.prefab"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "includes",
+      "file": "assets/prefabs/HeroCard.prefab",
+      "value": "\"_string\": \"PLAY NOW\"",
+      "message": "Label _string must be PLAY NOW"
+    },
+    {
+      "type": "not_includes",
+      "file": "assets/prefabs/HeroCard.prefab",
+      "value": "HEADLESS PREFAB OK",
+      "message": "old label text must be gone"
+    }
+  ]
+}

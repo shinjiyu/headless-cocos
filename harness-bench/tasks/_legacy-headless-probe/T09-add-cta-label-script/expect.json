@@ -1,0 +1,32 @@
+{
+  "id": "T09-add-cta-label-script",
+  "workdir": "copy-template",
+  "files": ["assets/scripts/HeadlessProbe.ts"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "CtaLabel",
+      "message": "must create/name CtaLabel"
+    },
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "TAP TO PLAY",
+      "message": "label string TAP TO PLAY required"
+    },
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "\\bLabel\\b",
+      "message": "must use Label component"
+    },
+    {
+      "type": "regex",
+      "file": "assets/scripts/HeadlessProbe.ts",
+      "pattern": "fontSize\\s*=\\s*28|fontSize:\\s*28",
+      "message": "font size 28"
+    }
+  ]
+}

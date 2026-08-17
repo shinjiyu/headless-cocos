@@ -1,0 +1,8 @@
+work/
+results/
+.env.glm
+.env
+.env.deepseek
+.env.workbuddy
+.env.*.local
+*.secret

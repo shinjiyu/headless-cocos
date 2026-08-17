@@ -37,10 +37,11 @@ loading-h5/
 |------|------|------|
 | `範圍` / `范围` | 安全框 | **不进包** |
 | `背景` / `BG` | BG | BgPlus 适配缩放，中心对齐；横/竖各一 |
-| `原画` | 前景主图 | 相对 BG 的 PSD 偏移锁定同一 scale |
-| `进度条` / `進度` | 进度轨 | 优先 **CSS 假进度**；轨图可选作底 |
+| **其余可见层** | **前景** | 同方向组内全部合成一张透明图（主体+LOGO+TAP…）；相对 BG 的 PSD 偏移锁定同一 scale |
 | 组名含 `横` / `橫` | landscape | |
 | 组名含 `竖` / `直` | portrait | |
+
+进度条优先用壳内 **CSS 假进度**（不单独吃一层）。
 
 有效可见 = 自身可见 ∧ 祖先可见（尊重 `scene-edit` / `effectiveHidden`）。
 
@@ -64,7 +65,7 @@ node ../../portal/scripts/build-loading-h5.mjs --job-dir .
 ## 壳结构（对齐 dndh poke-splash）
 
 - `#splash.poke-splash` 全屏 overflow:hidden；无 `#GameCanvas` 真引擎
-- BG / 原画：绝对定位 `<img>`，按 `designScale(1120×630)` 布局
+- BG / 前景：绝对定位 `<img>`；**画布中心安全区 1120×630（竖 630×1120）铺满视口**
 - 进度：视口底 UI 覆盖层，`ProgressController` 假进度约到 85%～90%
 - `resize` / 横竖切换时重算 scale 与资源
 
@@ -72,10 +73,9 @@ node ../../portal/scripts/build-loading-h5.mjs --job-dir .
 
 ## 资源策略
 
-- **整图不切块**（不做五块纹理切片），但**布局对齐 BgPlus 十字切适配**
-- 安全区设计分辨率：**1120×630**（横）/ **630×1120**（竖），`FIXED_WIDTH`/`FIXED_HEIGHT`
-- BG：源图像素 1:1，**中心对齐屏幕**；更宽露左右、更高露上下（不是 `background-size: cover`）
-- 原画：按 PSD 相对 BG 的 left/top 锁定同一 scale
+- **整图不切块**（不做五块纹理切片）
+- 前景：同方向非背景层合成一张透明图
+- 布局：PSD 画布中心裁 **1120×630 / 630×1120** 安全区并铺满屏幕（避免 contain 留白、LOGO 拉偏）
 - 导出：统一长边上限 WebP（可选 AVIF）
 
 ## 验收

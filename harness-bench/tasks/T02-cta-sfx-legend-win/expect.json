@@ -1,0 +1,21 @@
+{
+  "id": "T02-cta-sfx-legend-win",
+  "files": [
+    "assets/scripts/_genbot/CTA/CTA.view.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/_genbot/CTA/CTA.view.ts",
+      "pattern": "Sfx\\.play\\(\\s*[\"']legend_win[\"']",
+      "message": "must play legend_win on CTA open"
+    },
+    {
+      "type": "not_regex",
+      "file": "assets/scripts/_genbot/CTA/CTA.view.ts",
+      "pattern": "Sfx\\.play\\(\\s*[\"']bigwin[\"']",
+      "message": "bigwin must not remain as CTA open sfx"
+    }
+  ]
+}

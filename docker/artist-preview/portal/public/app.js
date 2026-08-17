@@ -11,6 +11,7 @@ const psdLink = $('psdLink');
 const previewLink = $('previewLink');
 const editorLink = $('editorLink');
 const convertBtn = $('convertBtn');
+const deleteBtn = $('deleteBtn');
 const loadingPreviewBtn = $('loadingPreviewBtn');
 const loadingPreviewLink = $('loadingPreviewLink');
 const loadingQrBtn = $('loadingQrBtn');
@@ -139,6 +140,38 @@ async function refreshHealth() {
   }
 }
 
+async function deleteJob(id, name) {
+  const label = name || id.slice(0, 8);
+  if (!window.confirm(`确定删除稿件「${label}」？\n将清除源 PSD、切图与 Loading 预览，不可恢复。`)) {
+    return false;
+  }
+  try {
+    await api(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    logStatus(`deleted ${id.slice(0, 8)}…`);
+    if (currentId === id) {
+      stopPoll();
+      stopLoadingPoll();
+      currentId = null;
+      currentJob = null;
+      currentEl.hidden = true;
+      currentActions.hidden = true;
+      setLoadingLink('#', false);
+      setHero('导入或选择稿件', '解析完成后会<strong>整页进入图层编辑器</strong>。也可把 PSD 拖到本页任意处上传。');
+      logsEl.textContent = '';
+    }
+    await refreshJobs();
+    return true;
+  } catch (e) {
+    logStatus(`delete failed: ${e.message}`);
+    showTaskToast(`删除失败：${e.message}`, {
+      kind: 'error',
+      hideSpin: true,
+      autoHideMs: 5000,
+    });
+    return false;
+  }
+}
+
 function renderJobs(jobs) {
   if (!jobs.length) {
     jobsEl.textContent = '暂无稿件 — 点右上角导入';
@@ -149,12 +182,21 @@ function renderJobs(jobs) {
     const row = document.createElement('div');
     row.className = 'job-item' + (j.id === currentId ? ' active' : '');
     row.innerHTML = `
-      <div style="min-width:0">
+      <div class="job-main" style="min-width:0;flex:1">
         <div class="name">${escapeHtml(j.originalName || j.id)}</div>
         <div class="sub">${escapeHtml(j.id.slice(0, 8))} · ${formatBytes(j.size)}</div>
       </div>
-      <span class="badge ${j.status}">${escapeHtml(j.status)}</span>
+      <div class="job-side">
+        <span class="badge ${j.status}">${escapeHtml(j.status)}</span>
+        <button type="button" class="job-del" title="删除稿件" aria-label="删除">删除</button>
+      </div>
     `;
+    const delBtn = row.querySelector('.job-del');
+    delBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteJob(j.id, j.originalName);
+    });
     row.addEventListener('click', () => {
       if (j.status === 'edit_ready') goEditor(j.id);
       else selectJob(j.id);
@@ -343,6 +385,12 @@ convertBtn.addEventListener('click', async () => {
   } catch (e) {
     logStatus(`convert: ${e.message}`);
   }
+});
+
+deleteBtn?.addEventListener('click', async () => {
+  if (!currentId) return;
+  const name = currentJob?.originalName;
+  await deleteJob(currentId, name);
 });
 
 function openPreviewUrl(pathUrl) {

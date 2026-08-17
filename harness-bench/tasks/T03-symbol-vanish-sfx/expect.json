@@ -1,0 +1,15 @@
+{
+  "id": "T03-symbol-vanish-sfx",
+  "files": [
+    "assets/scripts/audio/BoardAudioBinder.ts"
+  ],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "regex",
+      "file": "assets/scripts/audio/BoardAudioBinder.ts",
+      "pattern": "[\"']symbol-vanish[\"']\\s*:\\s*[\"']symbol_vanish[\"']",
+      "message": "must map symbol-vanish → symbol_vanish"
+    }
+  ]
+}

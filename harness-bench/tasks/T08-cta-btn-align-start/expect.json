@@ -1,0 +1,15 @@
+{
+  "id": "T08-cta-btn-align-start",
+  "files": ["assets/resources/prefab/CTA.prefab"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "node_lpos_y",
+      "file": "assets/resources/prefab/CTA.prefab",
+      "node": "btn",
+      "y": -524.8,
+      "tolerance": 2,
+      "message": "CTA btn y must align near MainUI Btn (~-524.8)"
+    }
+  ]
+}

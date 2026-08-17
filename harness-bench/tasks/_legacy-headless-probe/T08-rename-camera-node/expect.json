@@ -1,0 +1,20 @@
+{
+  "id": "T08-rename-camera-node",
+  "workdir": "copy-template",
+  "files": ["assets/scene/PreviewBoot.scene"],
+  "forbidMetaRewrite": true,
+  "checks": [
+    {
+      "type": "includes",
+      "file": "assets/scene/PreviewBoot.scene",
+      "value": "\"_name\": \"MainCamera\"",
+      "message": "node MainCamera must exist"
+    },
+    {
+      "type": "not_includes",
+      "file": "assets/scene/PreviewBoot.scene",
+      "value": "\"_name\": \"Camera\"",
+      "message": "old Camera name should be gone"
+    }
+  ]
+}

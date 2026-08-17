@@ -1,0 +1,27 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "_name": "MainUI",
+    "data": { "__id__": 1 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "MainUI",
+    "_children": [ { "__id__": 2 }, { "__id__": 3 } ]
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "startBtn",
+    "_lpos": { "__type__": "cc.Vec3", "x": 0, "y": -420, "z": 0 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "msg_marquee_mask",
+    "_components": [ { "__id__": 4 } ]
+  },
+  {
+    "__type__": "cc.UITransform",
+    "_contentSize": { "__type__": "cc.Size", "width": 280, "height": 64 },
+    "node": { "__id__": 3 }
+  }
+]

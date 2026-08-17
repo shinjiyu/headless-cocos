@@ -1,0 +1,4 @@
+info face="font_msgwin" size=32
+common lineHeight=36
+page id=0 file="font_msgwin.png"
+chars count=0
