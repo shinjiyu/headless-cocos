@@ -15,5 +15,6 @@ description: >-
 - 磁盘是唯一真相。改 `assets/`，等预览 HMR。
 - 禁止 Creator / `cocosmcp` / `Editor.Message`。
 - 业务节点要 `view.xxx` → 写入 bind → `POST /__viewweaver`。只改 XY / 换图不必跑。
+- 场景 / Prefab 挂自定义脚本时，`__type__` 使用 chunk 中 `_RF.push` 注册的压缩 Class ID，不能使用 `.ts.meta` 完整 UUID。
 - 禁止手改 `*.gen.ts`，禁止无必要 `--regen-bind`，禁止改已有 `.meta` uuid。
 - 只用本工程 `extensions/viewweaver`，不要外带 CLI。

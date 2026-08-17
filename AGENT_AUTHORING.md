@@ -74,6 +74,17 @@ node tools/import-to-headless.mjs --project $GAME --id CheeseBox_01 --catalog ht
 - 改 `_name`（若该节点已在 bind 里，改完必须跑 ViewWeaver）
 - 在数组末尾**追加**新节点 + 组件，并把新 `__id__` 挂到父节点 `_children`
 
+### 挂自定义脚本组件
+
+场景 / Prefab 组件对象的 `__type__` 必须写脚本编译后的 **压缩 Class ID**，不能直接写 `.ts.meta` 里的完整 UUID。完整 UUID 只用于资源和 packer 映射；写进 `__type__` 会让 JSON、编译和 HMR 全部成功，但运行时无法实例化组件，`start()` / `onLoad()` 不会执行。
+
+1. 保存 `assets/**/*.ts`，等待 mini-packer 生成 chunk。
+2. 在对应 chunk 中找到 `_RF.push({}, "<class-id>", "<ClassName>"`。
+3. 把 `<class-id>` 写入组件对象的 `__type__`。
+4. 验收时确认组件已在运行时实例化，不要只检查 scene JSON、chunk 存在或 HMR 成功。
+
+例如 meta UUID `24864e7d-832e-467a-ad51-be5da0dad6c6` 编译后注册为 `2486459gy5Geq1Rvl2g2tbG`，场景组件必须使用后者。
+
 不要做：
 
 - 为了「更干净」重排整份 JSON 却忘了 remap `__id__`
@@ -209,3 +220,6 @@ node spike/viewweaver-host.mjs --project $GAME --all
 - 无必要 `--regen-bind`
 - 轮转已有 uuid
 - 用外部分支的 ViewWeaver CLI 覆盖本工程扩展
+- 进 `runtime/` 跑 `npm install` / `npm ci` / `npm prune`
+- 改 `runtime/package.json` 的 `engines` 好让 npm 能装
+- 为补 `@babel/helpers`、`@cocos/*` 去装包（那是 runtime 坏了：整目录覆盖 `runtime/3.8.8`，不要装）
