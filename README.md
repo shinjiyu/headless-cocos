@@ -1,4 +1,11 @@
-﻿<div align="center">
+<div align="center">
+
+> **STATUS: MIGRATED / READ-ONLY**  
+> Active development has moved to **[kurenai-studio/kurenai](https://github.com/kurenai-studio/kurenai)**.  
+> This repository is frozen as a historical research snapshot of the Creator 3.8 headless preview stack. Do not open new PRs here for product features.
+
+
+
 
 # Headless Cocos
 

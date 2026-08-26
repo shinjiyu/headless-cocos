@@ -1,5 +1,12 @@
 <div align="center">
 
+> **状态：已迁移 / 只读**  
+> 后续开发已迁至 **[kurenai-studio/kurenai](https://github.com/kurenai-studio/kurenai)**。  
+> 本仓库冻结为 Creator 3.8 无头预览栈的历史研究快照，请勿再向此仓库提交产品功能 PR。
+
+
+
+
 # Headless Cocos
 
 ### Cocos Creator 3.8 无头预览栈 — 无需常开 IDE
